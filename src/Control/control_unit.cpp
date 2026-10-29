@@ -14,6 +14,8 @@ ControlUnit::ControlUnit()
       microPC_(-1),
       programLoaded_(false),
       instructionActive_(false) {
+    // Empty stack: R30 points one byte past the 64 KiB data memory.
+    registerFile_.write(30, 65536);
 }
 
 void ControlUnit::loadProgram(const MicrocodeProgram& program) {
@@ -210,7 +212,7 @@ bool ControlUnit::stepMicroinstruction() {
                 if (registerIndexValue < 0 ||
                     registerIndexValue >=
                         static_cast<std::int64_t>(
-                            registers::RegisterFile::REGISTER_COUNT
+                            risc201::RegisterFile::NUM_REGS
                         )) {
                     throw std::out_of_range(
                         "MMOV: invalid architectural register index"

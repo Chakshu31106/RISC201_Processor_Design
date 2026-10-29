@@ -22,6 +22,9 @@ int main() {
 
     // Return address must be the next instruction.
     assert(cu.readRegister(31) == 108);
+    assert(cu.readRegister(30) == 65528);
+    assert(cu.readMemoryWord(65528) == 108);
+    assert(cu.readMemoryWord(65532) == 0);
 
     // Target address must be PC + offset = 120.
     assert(

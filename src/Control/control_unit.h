@@ -65,7 +65,7 @@ private:
     FPU fpu_;
     MicrocodeProgram program_;
     InternalRegisterValues registers_{};
-    registers::RegisterFile registerFile_;
+    risc201::RegisterFile registerFile_;
     memory::Memory memory_;
 
     int microPC_ = -1;

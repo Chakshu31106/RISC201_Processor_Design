@@ -1,6 +1,7 @@
 #include "microcode.h"
 
 #include <stdexcept>
+#include <limits>
 
 namespace control {
 

@@ -43,6 +43,7 @@
 #include "fpu_microcode/fabs_microcode.h"
 #include "fpu_microcode/fsin_microcode.h"
 #include "fpu_microcode/fcos_microcode.h"
+#include "fpu_microcode/acos_microcode.h"
 #include "vector_microcode/vadd_microcode.h"
 #include "vector_microcode/vsub_microcode.h"
 #include "vector_microcode/vdot_microcode.h"
@@ -55,6 +56,11 @@
 #include "vector_microcode/vld_microcode.h"
 #include "vector_microcode/vst_microcode.h"
 #include "vector_microcode/vang_microcode.h"
+#include "stack_microcode/push_microcode.h"
+#include "stack_microcode/pop_microcode.h"
+#include "stack_microcode/mpop_microcode.h"
+#include "stack_microcode/peek_microcode.h"
+#include "stack_microcode/clr_microcode.h"
 
 namespace control {
 
@@ -124,6 +130,7 @@ inline MicrocodeProgram buildDefaultMicrocode() {
     buildFabsRoutine(builder);
     buildSinRoutine(builder);
     buildCosRoutine(builder);
+    buildAcosRoutine(builder);
     buildVaddRoutine(builder);
     buildVsubRoutine(builder);
     buildVdotRoutine(builder);
@@ -136,6 +143,11 @@ inline MicrocodeProgram buildDefaultMicrocode() {
     buildVldRoutine(builder);
     buildVstRoutine(builder);
     buildVangRoutine(builder);
+    buildPushRoutine(builder);
+    buildPopRoutine(builder);
+    buildMpopRoutine(builder);
+    buildPeekRoutine(builder);
+    buildClrRoutine(builder);
 
     // Resolve labels and load all routines into Control Memory.
     builder.finalize(program);

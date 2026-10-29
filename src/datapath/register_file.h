@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "isa/registers.h"
+#include "ISA/registers.h"
 
 namespace risc201 {
 

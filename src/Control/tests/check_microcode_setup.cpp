@@ -55,6 +55,7 @@ int main() {
         control::isa::FABS,
         control::isa::SIN,
         control::isa::COS,
+        control::isa::ACOS,
 
         control::isa::VADD,
         control::isa::VSUB,
@@ -68,7 +69,13 @@ int main() {
         control::isa::NOP,
         control::isa::VLD,
         control::isa::VST,
-        control::isa::VANG
+        control::isa::VANG,
+
+        control::isa::PUSH,
+        control::isa::POP,
+        control::isa::MPOP,
+        control::isa::PEEK,
+        control::isa::CLR
     };
 
     std::set<int> uniqueEntries;
