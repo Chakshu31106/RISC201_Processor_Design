@@ -7,7 +7,7 @@ static std::string binary_output_path(std::string path) {
     if (dot != std::string::npos && (slash == std::string::npos || dot > slash)) {
         path.erase(dot);
     }
-    return path + ".bin";
+    return path + ".bin"; 
 }
 
 static void write_binary_file(const std::string& path, const std::vector<uint64_t>& words) {
@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
     try {
         auto source = read_source_file(input_path);
         auto tokens = tokenize(source);
+        tokens = expand_stack_macros(tokens);
         auto symbols = build_symbol_table(tokens);
         std::vector<uint64_t> words;
         int errors = 0;

@@ -24,12 +24,12 @@ abs  r9
 and  r3, r1, r2
 or   r4, r1, r2
 xor  r5, r3, r4
-not  r6,
+not  r6, r5
 nand r7, r1, r2
 nor  r8, r1, r2
 
 ; ---- not_operand_test ----
-not r1,
+not r1, r4
 
 ; ---- shift_test ----
 lsl  r3, r1, r2
@@ -84,6 +84,21 @@ peek r7
 mpop #3
 clr
 
+; ---- stack_macro_test ----
+mov r1, 1
+mov r2, 2
+mov r3, 3
+
+start: pushm r1, r2, r3
+add r4, r1, r2
+pushm r4
+popm r4
+popm r1, r2, r3
+cmp r1, 5
+bgt done
+b start
+done: nop
+
 ; ---- float_test ----
 fadd r1, r2, r3
 fsub r4, r5, r6
@@ -113,7 +128,7 @@ vst r26, r5, 100
 vld r20, [r2 + #8]
 vst r23, [r4 + #16]
 vld r27, 12[r5]
-vld r26, r7
+vld r26, 0[r7]
 
 ; ---- factorial ----
 mov r1, 1

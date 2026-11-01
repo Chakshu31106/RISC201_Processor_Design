@@ -8,11 +8,13 @@
 #include <stdexcept>
 #include <string>
 
+
 static uint64_t parse_word(const std::string& text) {
     if (text.empty()) {
         throw std::runtime_error("empty instruction");
     }
 
+    
     bool is_binary = (text.size() == 64);
 
     if (is_binary) {
@@ -70,6 +72,7 @@ int main(int argc, char** argv) {
 
     std::string input_path = argv[1];
 
+    
     bool binary_output =
         input_path.size() >= 4 &&
         input_path.substr(input_path.size() - 4) == ".bin";
@@ -89,11 +92,13 @@ int main(int argc, char** argv) {
     while (std::getline(in, line)) {
         ++line_number;
 
+        
         auto comment = line.find(';');
         if (comment != std::string::npos) {
             line.erase(comment);
         }
 
+        
         auto first = line.find_first_not_of(" \t\r\n");
         if (first == std::string::npos) {
             continue;
@@ -105,6 +110,7 @@ int main(int argc, char** argv) {
         try {
             uint64_t word = parse_word(line);
 
+            
             if (binary_output) {
                 std::cout << std::bitset<64>(word);
             } else {
@@ -116,6 +122,7 @@ int main(int argc, char** argv) {
                           << std::setfill(' ');
             }
 
+            
             std::cout << "  "
                       << disassemble_one(word)
                       << "\n";

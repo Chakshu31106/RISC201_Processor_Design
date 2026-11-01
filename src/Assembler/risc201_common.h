@@ -1,5 +1,4 @@
 #pragma once
-
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -12,12 +11,13 @@
 #include <unordered_map>
 #include <vector>
 
+
 struct Token {
-    std::string label;
-    std::string mnemonic;
-    std::vector<std::string> operands;
-    uint32_t address = 0;
-    int line_number = 0;
+    std::string label;                     
+    std::string mnemonic;                  
+    std::vector<std::string> operands;    
+    uint32_t address = 0;                  
+    int line_number = 0;                   
 };
 
 enum class Format {
@@ -28,51 +28,94 @@ enum class Format {
     FP_R, FP_CMP, FP_R1,
     VEC_3REG, VEC_LOAD, VEC_STORE, VEC_SCALAR2, VEC_SCALAR1,
     NO_OPERAND,
-    R1S
+    R1S   
 };
 
 struct OpcodeInfo {
-    uint8_t opcode;
-    Format format;
-    std::string mnemonic;
+    uint8_t opcode;  
+    Format format;   
+    std::string mnemonic;  
 };
+
 
 extern const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable;
 
 extern const std::unordered_map<uint8_t, OpcodeInfo> kOpcodeByValue;
 
+
+
 extern const std::unordered_map<std::string, uint8_t> kImmCapable;
+
 
 extern const std::unordered_map<std::string, int> kRegisterAliases;
 
+
+
+
 bool is_register_operand(const std::string& s);
+
 
 uint8_t parse_register(const std::string& operand);
 
+
 std::string register_name(uint8_t num);
+
 
 int64_t parse_immediate(const std::string& operand);
 
+
 uint64_t to_signed_field(int64_t value, int bits);
+
 
 int64_t from_signed_field(uint64_t raw, int bits);
 
+
 void pack_field(uint64_t& word, uint64_t value, int hi, int lo);
+
 
 uint64_t extract_field(uint64_t word, int hi, int lo);
 
+
+
+
+
+
+
+
+
+
+
+
+
 std::vector<Token> tokenize(const std::vector<std::string>& lines);
+std::vector<Token> expand_stack_macros(const std::vector<Token>& tokens);
+
+
+
+
+
 
 std::unordered_map<std::string, uint32_t> build_symbol_table(
     std::vector<Token>& tokens, uint32_t start_address = 0);
+
+
+
+
+
 
 uint64_t encode_R(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t rs2);
 uint64_t encode_R_IMM(uint8_t opcode, uint8_t rd, uint8_t rs1, int64_t imm);
 uint64_t encode_CMP(uint8_t opcode, uint8_t rs1, uint8_t rs2);
 
+
+
 uint64_t encode_CMP_IMM(uint8_t opcode, uint8_t rs1, int64_t imm);
 
 uint64_t encode_R1(uint8_t opcode, uint8_t rd, uint8_t rs1);
+
+
+
+
 
 uint64_t encode_R1S(uint8_t opcode, uint8_t rs1);
 
@@ -82,7 +125,17 @@ uint64_t encode_BRANCH_NOOP(uint8_t opcode);
 uint64_t encode_MEM_LOAD(uint8_t opcode, uint8_t rd_dest, uint8_t rs1_base, int64_t offset);
 uint64_t encode_MEM_STORE(uint8_t opcode, uint8_t rd_base, uint8_t rs1_value, int64_t offset);
 
+
+
+
+
+
 uint64_t encode_MOVE_REG(uint8_t opcode, uint8_t rd, uint8_t rs2, uint8_t mode);
+
+
+
+
+
 
 uint64_t encode_MOVE_IMM(uint8_t opcode, uint8_t rd, uint8_t mode, int64_t value);
 
@@ -98,17 +151,44 @@ uint64_t encode_VEC_SCALAR2(uint8_t opcode, uint8_t rd_gpr, uint8_t vs1, uint8_t
 uint64_t encode_VEC_SCALAR1(uint8_t opcode, uint8_t rd_gpr, uint8_t vs1);
 uint64_t encode_NO_OPERAND(uint8_t opcode);
 
+
+
+
+
+
+
+
+
+
+
+
+
 uint64_t encode_instruction(
     const Token& tok,
     const std::unordered_map<std::string, uint32_t>& symbol_table);
+
+
 
 std::vector<uint64_t> pass2_encode(
     std::vector<Token>& tokens,
     const std::unordered_map<std::string, uint32_t>& symbol_table);
 
+
+
+
+
+
+
+
+
+
 std::string disassemble_one(uint64_t word);
 
-bool is_register_operand(const std::string& s) {
+
+
+
+
+bool is_register_operand(const std::string& s){
     if (s.empty()) return false;
     if (kRegisterAliases.count(s)) return true;
     if ((s[0] == 'r' || s[0] == 'R') && s.size() > 1) {
@@ -132,6 +212,7 @@ uint8_t parse_register(const std::string& operand) {
         throw std::runtime_error("Register out of range (r0-r31): " + operand);
     return static_cast<uint8_t>(num);
 }
+
 uint8_t parse_vector_register(const std::string& operand) {
     if (operand.size() < 2 ||
         (operand[0] != 'v' && operand[0] != 'V')) {
@@ -181,15 +262,13 @@ struct MemoryOperand {
     uint8_t base;
     int64_t offset;
 };
+
 static std::string trim(const std::string& s) {
     size_t start = s.find_first_not_of(" \t\r\n");
-
     if (start == std::string::npos) {
         return "";
     }
-
     size_t end = s.find_last_not_of(" \t\r\n");
-
     return s.substr(start, end - start + 1);
 }
 
@@ -217,6 +296,8 @@ MemoryOperand parse_memory_operand(const std::string& s) {
     int64_t offset = parse_immediate(offset_text);
     uint8_t base = parse_register(base_text);
 
+    
+    
     const int64_t min_offset = -(int64_t{1} << 41);
     const int64_t max_offset =  (int64_t{1} << 41) - 1;
 
@@ -262,18 +343,21 @@ uint64_t extract_field(uint64_t word, int hi, int lo) {
     return (word >> lo) & mask;
 }
 
+
 const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable = {
+    
     {"add",  {0x00, Format::R,        "add"}},
     {"sub",  {0x01, Format::R,        "sub"}},
     {"mul",  {0x02, Format::R,        "mul"}},
     {"div",  {0x03, Format::R,        "div"}},
     {"mod",  {0x04, Format::R,        "mod"}},
-    {"cmp",  {0x05, Format::CMP,      "cmp"}},
-    {"incr", {0x06, Format::R1S,      "incr"}},
-    {"decr", {0x07, Format::R1S,      "decr"}},
+    {"cmp",  {0x05, Format::CMP,      "cmp"}},   
+    {"incr", {0x06, Format::R1S,      "incr"}}, 
+    {"decr", {0x07, Format::R1S,      "decr"}},  
     {"pow",  {0x08, Format::R,        "pow"}},
-    {"abs",  {0x09, Format::R1S,      "abs"}},
+    {"abs",  {0x09, Format::R1S,      "abs"}},  
 
+    
     {"and",  {0x10, Format::R,        "and"}},
     {"or",   {0x11, Format::R,        "or"}},
     {"not",  {0x12, Format::R1,       "not"}},
@@ -286,11 +370,13 @@ const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable = {
     {"rotl", {0x19, Format::R,        "rotl"}},
     {"rotr", {0x1A, Format::R,        "rotr"}},
 
+    
     {"pcnt", {0x20, Format::R1,       "pcnt"}},
     {"tog",  {0x21, Format::BIT,      "tog"}},
     {"sbit", {0x22, Format::BIT,      "sbit"}},
     {"cbit", {0x23, Format::BIT,      "cbit"}},
 
+    
     {"call", {0x30, Format::BRANCH,      "call"}},
     {"ret",  {0x31, Format::BRANCH_NOOP, "ret"}},
     {"b",    {0x32, Format::BRANCH,      "b"}},
@@ -298,16 +384,19 @@ const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable = {
     {"bgt",  {0x34, Format::BRANCH,      "bgt"}},
     {"bst",  {0x35, Format::BRANCH,      "bst"}},
 
+    
     {"ld",   {0x40, Format::MEM_LOAD,  "ld"}},
     {"st",   {0x41, Format::MEM_STORE, "st"}},
-    {"mov",  {0x42, Format::MOVE,      "mov"}},
+    {"mov",  {0x42, Format::MOVE,      "mov"}},  
 
+    
     {"push", {0x50, Format::STACK_1,       "push"}},
     {"pop",  {0x51, Format::STACK_1,       "pop"}},
     {"mpop", {0x52, Format::STACK_N_COUNT, "mpop"}},
     {"peek", {0x53, Format::STACK_1,       "peek"}},
     {"clr",  {0x54, Format::STACK_N_NOOP,  "clr"}},
 
+    
     {"fadd", {0x60, Format::FP_R,   "fadd"}},
     {"fsub", {0x61, Format::FP_R,   "fsub"}},
     {"fmul", {0x62, Format::FP_R,   "fmul"}},
@@ -318,6 +407,7 @@ const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable = {
     {"sin",  {0x67, Format::FP_R1,  "sin"}},
     {"cos",  {0x68, Format::FP_R1,  "cos"}},
 
+    
     {"vadd", {0x70, Format::VEC_3REG,    "vadd"}},
     {"vsub", {0x71, Format::VEC_3REG,    "vsub"}},
     {"vdot", {0x72, Format::VEC_SCALAR2, "vdot"}},
@@ -327,6 +417,7 @@ const std::unordered_map<std::string, OpcodeInfo> kOpcodeTable = {
     {"vld",  {0x76, Format::VEC_LOAD,    "vld"}},
     {"vst",  {0x77, Format::VEC_STORE,   "vst"}},
 
+    
     {"nop",  {0x7C, Format::NO_OPERAND, "nop"}},
 };
 
@@ -348,6 +439,15 @@ const std::unordered_map<std::string, int> kRegisterAliases = {
     {"ip", 29}, {"sp", 30}, {"ra", 31},
 };
 
+
+
+
+
+
+
+
+
+
 static std::vector<std::string> split_operands(const std::string& s) {
     std::vector<std::string> out;
     std::stringstream ss(s);
@@ -367,14 +467,16 @@ std::vector<Token> tokenize(const std::vector<std::string>& lines) {
         ++line_no;
         std::string line = raw_line;
 
+        
         size_t comment_pos = line.find(';');
         if (comment_pos != std::string::npos) line = line.substr(0, comment_pos);
         line = trim(line);
-        if (line.empty()) continue;
+        if (line.empty()) continue;  
 
         Token tok;
         tok.line_number = line_no;
 
+        
         size_t colon_pos = line.find(':');
         if (colon_pos != std::string::npos) {
             tok.label = trim(line.substr(0, colon_pos));
@@ -382,19 +484,21 @@ std::vector<Token> tokenize(const std::vector<std::string>& lines) {
         }
 
         if (line.empty()) {
-            tokens.push_back(tok);
+            tokens.push_back(tok);  
             continue;
         }
 
+        
         size_t space_pos = line.find_first_of(" \t");
         if (space_pos == std::string::npos) {
-            tok.mnemonic = line;
+            tok.mnemonic = line;  
         } else {
             tok.mnemonic = line.substr(0, space_pos);
             std::string operand_str = trim(line.substr(space_pos + 1));
             tok.operands = split_operands(operand_str);
         }
 
+        
         std::transform(tok.mnemonic.begin(), tok.mnemonic.end(), tok.mnemonic.begin(),
                         [](unsigned char c) { return std::tolower(c); });
 
@@ -403,6 +507,43 @@ std::vector<Token> tokenize(const std::vector<std::string>& lines) {
 
     return tokens;
 }
+std::vector<Token> expand_stack_macros(const std::vector<Token>& tokens) {
+    std::vector<Token> out;
+
+    auto fail = [](const Token& tok, const std::string& msg) {
+        throw std::runtime_error("Line " + std::to_string(tok.line_number) + ": " + msg);
+    };
+
+    for (const auto& tok : tokens) {
+        const std::string& m = tok.mnemonic;
+        const auto& ops = tok.operands;
+
+        if (m != "pushm" && m != "popm") {
+            out.push_back(tok);
+            continue;
+        }
+
+        if (ops.empty()) fail(tok, m + ": expected at least one register");
+
+        for (const auto& r : ops) {
+            if (!is_register_operand(r))
+                fail(tok, m + ": '" + r + "' is not a register");
+        }
+
+        for (size_t i = 0; i < ops.size(); ++i) {
+            size_t idx = (m == "pushm") ? i : ops.size() - 1 - i;
+            Token t;
+            t.label = (i == 0) ? tok.label : "";
+            t.mnemonic = (m == "pushm") ? "push" : "pop";
+            t.operands = { ops[idx] };
+            t.line_number = tok.line_number;
+            out.push_back(t);
+        }
+    }
+
+    return out;
+}
+
 
 std::unordered_map<std::string, uint32_t> build_symbol_table(
     std::vector<Token>& tokens, uint32_t start_address)
@@ -416,11 +557,13 @@ std::unordered_map<std::string, uint32_t> build_symbol_table(
         }
         tok.address = addr;
         if (!tok.mnemonic.empty()) {
-            addr += 8;
+            addr += 8;  
         }
     }
     return symbols;
 }
+
+
 
 uint64_t encode_R(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t rs2) {
     uint64_t w = 0;
@@ -428,8 +571,8 @@ uint64_t encode_R(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t rs2) {
     pack_field(w, rd,     56, 52);
     pack_field(w, rs1,    51, 47);
     pack_field(w, rs2,    46, 42);
-    pack_field(w, 0,      41, 41);
-    return w;
+    pack_field(w, 0,      41, 41);   
+    return w;                        
 }
 
 uint64_t encode_R_IMM(uint8_t opcode, uint8_t rd, uint8_t rs1, int64_t imm) {
@@ -437,7 +580,8 @@ uint64_t encode_R_IMM(uint8_t opcode, uint8_t rd, uint8_t rs1, int64_t imm) {
     pack_field(w, opcode, 63, 57);
     pack_field(w, rd,     56, 52);
     pack_field(w, rs1,    51, 47);
-    pack_field(w, 1,      41, 41);
+    
+    pack_field(w, 1,      41, 41);   
     pack_field(w, to_signed_field(imm, 41), 40, 0);
     return w;
 }
@@ -445,17 +589,21 @@ uint64_t encode_R_IMM(uint8_t opcode, uint8_t rd, uint8_t rs1, int64_t imm) {
 uint64_t encode_CMP(uint8_t opcode, uint8_t rs1, uint8_t rs2) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, rs1,    51, 47);
     pack_field(w, rs2,    46, 42);
-    pack_field(w, 0,      41, 41);
-    return w;
+    pack_field(w, 0,      41, 41);   
+    return w;                        
 }
+
 
 uint64_t encode_CMP_IMM(uint8_t opcode, uint8_t rs1, int64_t imm) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, rs1,    51, 47);
-    pack_field(w, 1,      41, 41);
+    
+    pack_field(w, 1,      41, 41);   
     pack_field(w, to_signed_field(imm, 41), 40, 0);
     return w;
 }
@@ -465,14 +613,17 @@ uint64_t encode_R1(uint8_t opcode, uint8_t rd, uint8_t rs1) {
     pack_field(w, opcode, 63, 57);
     pack_field(w, rd,     56, 52);
     pack_field(w, rs1,    51, 47);
-    return w;
+    return w;                        
 }
+
+
 
 uint64_t encode_R1S(uint8_t opcode, uint8_t rs1) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, rs1,    51, 47);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_BIT(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t bit_idx) {
@@ -481,12 +632,13 @@ uint64_t encode_BIT(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t bit_idx) {
     pack_field(w, rd,      56, 52);
     pack_field(w, rs1,     51, 47);
     pack_field(w, bit_idx, 46, 42);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_BRANCH(uint8_t opcode, int64_t offset) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, to_signed_field(offset, 42), 41, 0);
     return w;
 }
@@ -494,7 +646,7 @@ uint64_t encode_BRANCH(uint8_t opcode, int64_t offset) {
 uint64_t encode_BRANCH_NOOP(uint8_t opcode) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_MEM_LOAD(uint8_t opcode, uint8_t rd_dest, uint8_t rs1_base, int64_t offset) {
@@ -502,6 +654,7 @@ uint64_t encode_MEM_LOAD(uint8_t opcode, uint8_t rd_dest, uint8_t rs1_base, int6
     pack_field(w, opcode,   63, 57);
     pack_field(w, rd_dest,  56, 52);
     pack_field(w, rs1_base, 51, 47);
+    
     pack_field(w, to_signed_field(offset, 42), 41, 0);
     return w;
 }
@@ -511,25 +664,34 @@ uint64_t encode_MEM_STORE(uint8_t opcode, uint8_t rd_base, uint8_t rs1_value, in
     pack_field(w, opcode,    63, 57);
     pack_field(w, rd_base,   56, 52);
     pack_field(w, rs1_value, 51, 47);
+    
     pack_field(w, to_signed_field(offset, 42), 41, 0);
     return w;
 }
+
+
+
+
+
 
 uint64_t encode_MOVE_REG(uint8_t opcode, uint8_t rd, uint8_t rs2, uint8_t mode) {
     uint64_t w = 0;
     pack_field(w, opcode,      63, 57);
     pack_field(w, rd,          56, 52);
+    
     pack_field(w, rs2,         46, 42);
-    pack_field(w, 0,           41, 41);
+    pack_field(w, 0,           41, 41);   
     pack_field(w, mode & 0x3,  40, 39);
-    return w;
+    return w;                             
 }
+
 
 uint64_t encode_MOVE_IMM(uint8_t opcode, uint8_t rd, uint8_t mode, int64_t value) {
     uint64_t w = 0;
     pack_field(w, opcode,       63, 57);
     pack_field(w, rd,           56, 52);
-    pack_field(w, 1,            41, 41);
+    
+    pack_field(w, 1,            41, 41);  
     pack_field(w, mode & 0x3,   40, 39);
     pack_field(w, to_signed_field(value, 39), 38, 0);
     return w;
@@ -539,12 +701,13 @@ uint64_t encode_STACK_1(uint8_t opcode, uint8_t rd) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
     pack_field(w, rd,     56, 52);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_STACK_N_COUNT(uint8_t opcode, int64_t count) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, to_signed_field(count, 42), 41, 0);
     return w;
 }
@@ -552,7 +715,7 @@ uint64_t encode_STACK_N_COUNT(uint8_t opcode, int64_t count) {
 uint64_t encode_STACK_N_NOOP(uint8_t opcode) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_FP_R(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t rs2) {
@@ -561,15 +724,16 @@ uint64_t encode_FP_R(uint8_t opcode, uint8_t rd, uint8_t rs1, uint8_t rs2) {
     pack_field(w, rd,     56, 52);
     pack_field(w, rs1,    51, 47);
     pack_field(w, rs2,    46, 42);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_FP_CMP(uint8_t opcode, uint8_t rs1, uint8_t rs2) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
+    
     pack_field(w, rs1,    51, 47);
     pack_field(w, rs2,    46, 42);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_VEC_3REG(uint8_t opcode, uint8_t vd, uint8_t vs1, uint8_t vs2) {
@@ -578,7 +742,7 @@ uint64_t encode_VEC_3REG(uint8_t opcode, uint8_t vd, uint8_t vs1, uint8_t vs2) {
     pack_field(w, vd,     56, 52);
     pack_field(w, vs1,    51, 47);
     pack_field(w, vs2,    46, 42);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_VEC_LOAD(uint8_t opcode, uint8_t vd, uint8_t rs1_base, int64_t offset) {
@@ -586,6 +750,7 @@ uint64_t encode_VEC_LOAD(uint8_t opcode, uint8_t vd, uint8_t rs1_base, int64_t o
     pack_field(w, opcode,   63, 57);
     pack_field(w, vd,       56, 52);
     pack_field(w, rs1_base, 51, 47);
+    
     pack_field(w, to_signed_field(offset, 42), 41, 0);
     return w;
 }
@@ -595,6 +760,7 @@ uint64_t encode_VEC_STORE(uint8_t opcode, uint8_t rd_base, uint8_t vs1_value, in
     pack_field(w, opcode,    63, 57);
     pack_field(w, rd_base,   56, 52);
     pack_field(w, vs1_value, 51, 47);
+    
     pack_field(w, to_signed_field(offset, 42), 41, 0);
     return w;
 }
@@ -605,7 +771,7 @@ uint64_t encode_VEC_SCALAR2(uint8_t opcode, uint8_t rd_gpr, uint8_t vs1, uint8_t
     pack_field(w, rd_gpr, 56, 52);
     pack_field(w, vs1,    51, 47);
     pack_field(w, vs2,    46, 42);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_VEC_SCALAR1(uint8_t opcode, uint8_t rd_gpr, uint8_t vs1) {
@@ -613,14 +779,15 @@ uint64_t encode_VEC_SCALAR1(uint8_t opcode, uint8_t rd_gpr, uint8_t vs1) {
     pack_field(w, opcode, 63, 57);
     pack_field(w, rd_gpr, 56, 52);
     pack_field(w, vs1,    51, 47);
-    return w;
+    return w;                        
 }
 
 uint64_t encode_NO_OPERAND(uint8_t opcode) {
     uint64_t w = 0;
     pack_field(w, opcode, 63, 57);
-    return w;
+    return w;                        
 }
+
 
 uint64_t encode_instruction(
     const Token& tok,
@@ -652,6 +819,8 @@ uint64_t encode_instruction(
         }
 
         case Format::CMP: {
+            
+            
             if (ops.size() != 2) throw std::runtime_error("cmp: expected rs1, rs2/imm");
             bool last_is_reg = is_register_operand(ops[1]);
             if (last_is_reg) {
@@ -662,12 +831,15 @@ uint64_t encode_instruction(
         }
 
        case Format::R1: {
-          if (mnemonic == "not") {
-        if (ops.size() != 1)
-            throw std::runtime_error("not: expected rd");
+            if (mnemonic == "not") {
+        if (ops.size() != 2)
+            throw std::runtime_error("not: expected rd, rs1");
 
-        uint8_t rd = parse_register(ops[0]);
-        return encode_R1(opcode, rd, rd);
+        return encode_R1(
+            opcode,
+            parse_register(ops[0]),
+            parse_register(ops[1])
+        );
     }
 
     if (mnemonic == "pcnt") {
@@ -681,6 +853,7 @@ uint64_t encode_instruction(
         );
     }
 
+    
     if (ops.size() == 1) {
         uint8_t rd = parse_register(ops[0]);
         return encode_R1(opcode, rd, rd);
@@ -697,6 +870,8 @@ uint64_t encode_instruction(
     throw std::runtime_error(mnemonic + ": expected rd [, rs1]");
 }
         case Format::R1S: {
+            
+            
             if (ops.size() != 1) throw std::runtime_error(mnemonic + ": expected a single register (rs1)");
             return encode_R1S(opcode, parse_register(ops[0]));
         }
@@ -716,13 +891,15 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
         }
 
        case Format::BRANCH: {
+    
+    
     if (ops.size() != 1) throw std::runtime_error(mnemonic + ": expected a label or #offset");
     auto sym_it = symbol_table.find(ops[0]);
     int64_t target_offset;
     if (sym_it != symbol_table.end()) {
         target_offset = static_cast<int64_t>(sym_it->second) - static_cast<int64_t>(tok.address);
     } else {
-        target_offset = parse_immediate(ops[0]);
+        target_offset = parse_immediate(ops[0]);  
     }
     return encode_BRANCH(opcode, target_offset);
 }
@@ -765,6 +942,12 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
 }
 
         case Format::MOVE: {
+            
+            
+            
+            
+            
+            
             if (ops.size() != 2) throw std::runtime_error("mov: expected rd, rs2  OR  rd, #imm");
             bool last_is_reg = is_register_operand(ops[1]);
             if (last_is_reg) {
@@ -814,6 +997,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
 
         case Format::VEC_LOAD: {
             if (ops.size() == 3) {
+                
                 return encode_VEC_LOAD(
                     opcode,
                     parse_register(ops[0]),
@@ -821,17 +1005,9 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
                     parse_immediate(ops[2])
                 );
             }
-            if (ops.size() == 2 &&
-    ops[1].find('[') == std::string::npos) {
 
-    return encode_VEC_LOAD(
-        opcode,
-        parse_register(ops[0]),
-        parse_register(ops[1]),
-        0
-    );
-}
             if (ops.size() == 2) {
+                
                 std::string addr = ops[1];
                 addr.erase(
                     std::remove_if(addr.begin(), addr.end(),
@@ -851,6 +1027,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
                 std::string base;
                 std::string offset;
                 if (open == 0) {
+                    
                     std::string inside = addr.substr(1, close - 1);
                     std::size_t plus = inside.find('+');
                     if (plus == std::string::npos) {
@@ -859,6 +1036,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
                     base = inside.substr(0, plus);
                     offset = inside.substr(plus + 1);
                 } else {
+                    
                     offset = addr.substr(0, open);
                     base = addr.substr(open + 1, close - open - 1);
                 }
@@ -882,6 +1060,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
 
         case Format::VEC_STORE: {
             if (ops.size() == 3) {
+                
                 return encode_VEC_STORE(
                     opcode,
                     parse_register(ops[1]),
@@ -891,6 +1070,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
             }
 
             if (ops.size() == 2) {
+                
                 std::string addr = ops[1];
                 addr.erase(
                     std::remove_if(addr.begin(), addr.end(),
@@ -972,6 +1152,7 @@ std::vector<uint64_t> pass2_encode(
     return words;
 }
 
+
 std::string disassemble_one(uint64_t word) {
     uint8_t opcode = static_cast<uint8_t>(extract_field(word, 63, 57));
     auto it = kOpcodeByValue.find(opcode);
@@ -1003,6 +1184,7 @@ std::string disassemble_one(uint64_t word) {
             break;
         }
         case Format::CMP: {
+            
             uint8_t rs1 = extract_field(word, 51, 47);
             uint8_t I   = extract_field(word, 41, 41);
             if (I == 0) {
@@ -1017,11 +1199,12 @@ std::string disassemble_one(uint64_t word) {
         case Format::R1: {
             uint8_t rd  = extract_field(word, 56, 52);
             uint8_t rs1 = extract_field(word, 51, 47);
-            if (rd == rs1) oss << " " << register_name(rd);
+            if (rd == rs1 && m != "not" && m != "pcnt") oss << " " << register_name(rd);
             else oss << " " << register_name(rd) << ", " << register_name(rs1);
             break;
         }
         case Format::R1S: {
+            
             uint8_t rs1 = extract_field(word, 51, 47);
             oss << " " << register_name(rs1);
             break;
@@ -1041,7 +1224,7 @@ std::string disassemble_one(uint64_t word) {
         case Format::BRANCH_NOOP:
         case Format::STACK_N_NOOP:
         case Format::NO_OPERAND:
-            break;
+            break;  
         
         case Format::MEM_LOAD: {
             uint8_t rd  = extract_field(word, 56, 52);
@@ -1068,6 +1251,9 @@ std::string disassemble_one(uint64_t word) {
         }
 
         case Format::MOVE: {
+            
+            
+            
             uint8_t rd = extract_field(word, 56, 52);
             uint8_t I  = extract_field(word, 41, 41);
             if (I == 0) {
@@ -1150,6 +1336,18 @@ std::string disassemble_one(uint64_t word) {
     return oss.str();
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
 static void write_hex_file(const std::string& path, const std::vector<uint64_t>& words) {
     std::ofstream out(path);
     if (!out) {
@@ -1170,6 +1368,9 @@ static std::vector<std::string> read_source_file(const std::string& path) {
     while (std::getline(in, line)) lines.push_back(line);
     return lines;
 }
+
+
+
 
 static std::vector<std::string> demo_source() {
     return {
