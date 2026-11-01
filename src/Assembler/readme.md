@@ -10,4 +10,3 @@ g++ -std=c++17 risc201_disassembler.cpp -o disassembler
 ./disassembler test.hex   
 
 
-left - not and macro preprocesooor
