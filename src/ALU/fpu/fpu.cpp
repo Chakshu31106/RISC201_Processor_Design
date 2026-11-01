@@ -11,10 +11,13 @@ FPU::FPU()
     ST = false;
 }
 // Float store the number using same IEEE 754 format
+// Just change the sign bit to 0 we got absolute 
 uint32_t FPU::fabs(uint32_t a)
 {
     return a & 0x7FFFFFFFu;
 }
+// Each time we first check if the inputs is NAN or not
+// THIS WILL RETURN THE 3 SET FLAGS AFTER PROPER COMPARISION
 
 int32_t FPU::fcmp(uint32_t a, uint32_t b)
 {
@@ -60,6 +63,7 @@ int32_t FPU::fcmp(uint32_t a, uint32_t b)
     }
 
     // Same sign: compare magnitude bits
+    // AFTER CHECKING ALL EDGE CASES THE FLOAT ALSO BEHAVE SIMILAR TO INTEGER LIKE INCREASING EXPONENT OR FRACTION INCREASES THE VALUES JUST WE HAVE TO CHECK FOR SIGN 
     uint32_t magA = a & 0x7FFFFFFFu;
     uint32_t magB = b & 0x7FFFFFFFu;
 
@@ -94,29 +98,32 @@ bool FPU::getST()
 {
     return ST;
 }
-
+// THE MAIN IDEA USED IS TO FIRST EXTRACT THE SIGNED FIELD, EXPONENT FIELD AND FRACTION PART FROM UNSIGNED 32 BITS 
+// ROUNDING IS ALSO DONE WITH THE HELP THREE BITS ROUND GUARD AND STICKY
 // FADD OPERATION
 
 FPU::FloatParts FPU::unpack(uint32_t bits)
 {
     FloatParts p{};
 
-    // Extract the sign bit.
+    // Extract the last after rotation sign bit.
     p.sign = (bits >> 31) & 1u;
 
-    // Extract the 8-bit exponent.
+    // Extract the last after rotation 8-bit exponent.
     p.exponent = (bits >> 23) & 0xFFu;
 
-    // Extract the 23-bit fraction.
+    // Extract the last after rotation 23-bit fraction.
     p.fraction = bits & 0x7FFFFFu;
 
     // Restore the implicit leading bit for normal numbers.
     if (p.exponent == 0)
     {
+        // IF THE EXPONENT IS 0 THEN DIRECTLY SIGNIFICAND IS OUR FRACTION BCZ THE LEADING 1 WILL VANISH 
         p.significand = p.fraction;
     }
     else if (p.exponent != 255)
     {
+        // IF EXPONENT IS NOT ZERO THEN THE SIGNIFICAND WILL ALSO STORE THE LEADING BIT AND WE WILL WORK ON 24 BITS 
         p.significand = (1u << 23) | p.fraction;
     }
     else
@@ -159,6 +166,7 @@ FPU::AlignedParts FPU::alignExponents(FloatParts a, FloatParts b)
 }
 
 // Helps to in rounding of number by internally using 64 bits then chacking if the shifted out bits contain any one
+// WHEN WE ARE ALIGNING THE EXPONENT THERE ARE CHANCES THAT WE LOSE THE BITS BY RIGHT SHIFTING WHICH WILL EFFECT THE 
 uint64_t FPU::shiftRightJam(uint64_t value, unsigned int distance)
 {
     if (distance == 0)

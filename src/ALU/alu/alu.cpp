@@ -355,40 +355,65 @@ int32_t ALU::mul(int32_t a, int32_t b)
 
 // DIVISION
 
-void ALU::restoringDivide(
+void ALU::goldschmidtDivide(
     uint32_t dividend,
     uint32_t divisor,
     uint32_t &quotient,
     uint32_t &remainder)
 {
-    uint64_t R = 0;
-    uint32_t Q = dividend;
-
-    quotient = 0;
-
-    for (int i = 31; i >= 0; i--)
+    if (divisor == 0)
     {
-        // Shift R left and bring in the next dividend bit.
-        R = (R << 1) | ((Q >> i) & 1);
-
-        // Try subtracting the divisor.
-        if (R >= divisor)
-        {
-            R = R - divisor;
-
-            // Set the corresponding quotient bit.
-            quotient |= (1u << i);
-        }
+        quotient = 0;
+        remainder = 0;
+        return;
     }
 
-    remainder = static_cast<uint32_t>(R);
+    // Step 1: Normalize the divisor.
+    int k = 31 - __builtin_clz(divisor);
+
+    // Q31 representation of normalized divisor.
+    uint64_t M = (static_cast<uint64_t>(divisor) << 31) >> k;
+
+    // Step 2: Initial reciprocal approximation.
+    uint64_t Y = (48ULL * (1ULL << 31) - 16ULL * M) / 17ULL;
+
+    // Step 3: Goldschmidt iterations.
+    for (int i = 0; i < 5; i++)
+    {
+        uint64_t MY = static_cast<uint64_t>(
+            (static_cast<__uint128_t>(M) * Y) >> 31
+        );
+
+        uint64_t factor = (2ULL << 32) - MY;
+
+        Y = static_cast<uint64_t>(
+            (static_cast<__uint128_t>(Y) * factor) >> 32
+        );
+    }
+
+    // Step 4: Estimate quotient.
+    uint64_t numerator =
+        static_cast<uint64_t>(dividend) * Y;
+
+    uint64_t q = numerator >> (32 + k);
+
+    // Step 5: Correct quotient to guarantee exact division.
+    while (q * divisor > dividend)
+        q--;
+
+    while ((q + 1) * divisor <= dividend)
+        q++;
+
+    // Step 6: Calculate remainder.
+    quotient = static_cast<uint32_t>(q);
+    remainder = dividend - static_cast<uint32_t>(q * divisor);
 }
+
 
 int32_t ALU::div(int32_t a, int32_t b)
 {
-    // Division by zero
     if (b == 0)
-        return 0;   // temporary convention; document/change if ISA specifies otherwise
+        return 0;
 
     bool negative = (a < 0) ^ (b < 0);
 
@@ -403,12 +428,10 @@ int32_t ALU::div(int32_t a, int32_t b)
     uint32_t quotient;
     uint32_t remainder;
 
-    restoringDivide(ua, ub, quotient, remainder);
+    goldschmidtDivide(ua, ub, quotient, remainder);
 
     if (negative)
-    {
         quotient = ~quotient + 1;
-    }
 
     return static_cast<int32_t>(quotient);
 }
@@ -419,7 +442,7 @@ int32_t ALU::mod(int32_t a, int32_t b)
 {
     // Division by zero
     if (b == 0)
-        return 0;   // temporary convention
+        return 0;
 
     // Remainder sign follows the dividend.
     bool negative = (a < 0);
@@ -436,7 +459,7 @@ int32_t ALU::mod(int32_t a, int32_t b)
     uint32_t quotient;
     uint32_t remainder;
 
-    restoringDivide(ua, ub, quotient, remainder);
+    goldschmidtDivide(ua, ub, quotient, remainder);
 
     // C/C++-style remainder: sign follows dividend.
     if (negative)

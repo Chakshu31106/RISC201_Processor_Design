@@ -26,7 +26,7 @@ private:
         uint32_t &Q,
         int &Qminus1);
 
-    void restoringDivide(
+    void goldschmidtDivide(
         uint32_t dividend,
         uint32_t divisor,
         uint32_t &quotient,
@@ -71,7 +71,6 @@ public:
     int32_t sbit(int32_t a, int32_t bit);
     int32_t cbit(int32_t a, int32_t bit);
 
-    
     // Vector
     // signatures to be finalized from ISA semantics
     // to help read these value for cu in cmp instruction
