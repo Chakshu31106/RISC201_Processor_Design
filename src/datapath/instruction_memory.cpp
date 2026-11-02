@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "isa/hex_file.h"
+#include "ISA/hex_file.h"
 
 namespace risc201 {
 
