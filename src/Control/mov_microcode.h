@@ -14,13 +14,32 @@ inline void buildMovRoutine(MicrocodeBuilder& b) {
 
     b.beginRoutine("MOV", isa::MOV);
 
-    // Step 1: Read the value in architectural register rs2.
+    // Step 1: If I == 1 the source is the immediate (mov rd, #imm).
+    b.mbeq(
+        static_cast<int>(IR::I),
+        1,
+        "MOV_IMMEDIATE"
+    );
+
+    // Register form: read the value in architectural register rs2.
     b.mmov(
         static_cast<int>(IR::RS2),
         static_cast<int>(IR::REG_VAL),
         UnitId::REGISTER_FILE,
         static_cast<int>(RegisterFileAction::READ)
     );
+
+    b.mb("MOV_WRITE");
+
+    // Immediate form: take the value from the decoded immediate.
+    b.label("MOV_IMMEDIATE");
+
+    b.mmov(
+        static_cast<int>(IR::IMMX),
+        static_cast<int>(IR::REG_VAL)
+    );
+
+    b.label("MOV_WRITE");
 
     // Step 2: Select the destination architectural register rd.
     b.mmov(
@@ -42,6 +61,10 @@ inline void buildMovRoutine(MicrocodeBuilder& b) {
 
     b.finishRoutine();
 }
+
+} // namespace control
+
+#endif
 
 } // namespace control
 
