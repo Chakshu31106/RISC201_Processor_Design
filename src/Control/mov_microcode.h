@@ -66,6 +66,3 @@ inline void buildMovRoutine(MicrocodeBuilder& b) {
 
 #endif
 
-} // namespace control
-
-#endif
