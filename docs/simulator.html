@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RISC201 Simulator</title>
+<style>
+:root{--bg:#f4f5f8;--fg:#1c2230;--mu:#6a7388;--cd:#fff;--bd:#d8dce6;--ac:#2563eb;--hi:#fff1b8;--ok:#14803f;--er:#c23b2a;--ch:#d9f2e3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151b;--fg:#e3e7f0;--mu:#8b93a8;--cd:#1b2029;--bd:#2d3442;--ac:#6ea0ff;--hi:#4a3f12;--ok:#4cc781;--er:#ff7b69;--ch:#1d4a32;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12151b;--fg:#e3e7f0;--mu:#8b93a8;--cd:#1b2029;--bd:#2d3442;--ac:#6ea0ff;--hi:#4a3f12;--ok:#4cc781;--er:#ff7b69;--ch:#1d4a32;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.m,code,pre,textarea,td,.rg b,.rg i{font-family:ui-monospace,Menlo,Consolas,monospace}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px}
+h1{font-size:18px;margin:0 8px 0 0}
+button,select,input{font:inherit;color:var(--fg)}
+button,select{background:var(--cd);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+#status{margin-left:auto;padding:4px 10px;border-radius:12px;border:1px solid var(--bd);background:var(--cd)}
+.ok{color:var(--ok)}.er{color:var(--er)}.mu{color:var(--mu)}
+.g{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:12px;padding:0 14px 14px}
+@media (max-width:820px){.g{grid-template-columns:minmax(0,1fr)}}
+.c{background:var(--cd);border:1px solid var(--bd);border-radius:10px;padding:10px;min-width:0}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);margin:0 0 8px}
+textarea{width:100%;height:190px;background:transparent;border:1px solid var(--bd);border-radius:6px;padding:8px;color:var(--fg);font-size:13px;resize:vertical}
+.sc{overflow-x:auto;max-height:230px;overflow-y:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+td{padding:2px 6px;white-space:nowrap}
+tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}
+tr.cur{background:var(--hi)}
+.bp{color:var(--er);width:14px}
+.stg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stg.six{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1100px){.stg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sb{border:2px solid var(--bd);border-radius:8px;padding:8px;min-height:118px;font-size:12.5px;overflow-wrap:anywhere}
+.sb.on{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 25%,transparent)}
+.sb h3{margin:0 0 4px;font-size:13px;color:var(--ac)}
+.rgs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+@media (max-width:520px){.rgs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.rg{border:1px solid var(--bd);border-radius:6px;padding:4px 6px;display:flex;flex-direction:column;transition:background .4s}
+.rg span{font-size:11px;color:var(--mu)}.rg b{font-size:14px}.rg i{font-size:11px;color:var(--mu);font-style:normal}
+.rg.chg{background:var(--ch);border-color:var(--ok)}
+.fl{display:flex;gap:8px;margin-top:8px;align-items:center}
+.fl span{padding:2px 10px;border:1px solid var(--bd);border-radius:12px}
+.fl span.on{background:var(--ok);border-color:var(--ok);color:#fff}
+#log{margin:0;max-height:240px;overflow:auto;font-size:12.5px;white-space:pre-wrap}
+.o{grid-column:1/-1}
+</style></head><body>
+<header>
+<h1>RISC201 Simulator</h1>
+<select id="ex" aria-label="Example program"></select>
+<button id="bA">Assemble</button>
+<button id="bS" class="p">Step stage</button>
+<button id="bI">Step instruction</button>
+<button id="bRun">▶ Run</button>
+<button id="bR">Reset</button>
+<label class="mu">Speed <input id="spd" type="range" min="0" max="95" value="60"></label>
+<span id="status" class="mu">Ready</span>
+</header>
+<div class="g">
+<section class="c"><h2>Program</h2>
+<textarea id="src" spellcheck="false"></textarea>
+<div class="sc"><table id="ls"></table></div>
+<p class="mu" style="margin:6px 0 0;font-size:12px">Click a listing row to toggle a breakpoint.</p></section>
+<div style="display:grid;gap:12px;align-content:start;min-width:0">
+<section class="c"><h2>Pipeline stages <select id="pm" aria-label="Pipeline view" style="font:inherit;font-size:12px;margin-left:8px"><option value="4">4-stage: IF OF EX MA+RW</option><option value="6">6-stage: IF ID RR EX MA RW</option></select> <span class="mu" style="font-weight:400;font-size:12px">(display only: one instruction at a time)</span></h2><div class="stg" id="stg"></div></section>
+<section class="c"><h2>Registers <span id="cnt" class="mu"></span></h2><div class="rgs" id="regs"></div>
+<div class="fl"><span id="fe">E</span><span id="fg">GT</span><span id="fs">ST</span><small class="mu">flags set by cmp</small></div></section>
+<section class="c"><h2>Stack <span class="mu">(starts at the top, 0x10000, and grows down)</span></h2><pre id="stk" class="m" style="margin:0;font-size:12.5px"></pre></section>
+<section class="c"><h2>Data memory <span class="mu">(64 KB, big-endian)</span> <input id="ma" value="ffd0" size="8" class="m" aria-label="Start address (hex)" style="border:1px solid var(--bd);border-radius:4px;background:transparent;padding:1px 4px"></h2><pre id="mem" class="m" style="margin:0;font-size:12.5px"></pre></section>
+</div>
+<section class="c o"><h2>Output / trace</h2><pre id="log"></pre></section>
+</div>
+<script>
+const T={add:[0,'R'],sub:[1,'R'],mul:[2,'R'],div:[3,'R'],mod:[4,'R'],cmp:[5,'C'],incr:[6,'S'],decr:[7,'S'],pow:[8,'R'],abs:[9,'S'],and:[16,'R'],or:[17,'R'],not:[18,'U'],nor:[19,'R'],nand:[20,'R'],xor:[21,'R'],lsl:[22,'R'],lsr:[23,'R'],asr:[24,'R'],rotl:[25,'R'],rotr:[26,'R'],pcnt:[32,'U'],tog:[33,'B'],sbit:[34,'B'],cbit:[35,'B'],call:[48,'J'],ret:[49,'N'],b:[50,'J'],beq:[51,'J'],bgt:[52,'J'],bst:[53,'J'],ld:[64,'L'],st:[65,'T'],mov:[66,'M'],push:[80,'K'],pop:[81,'K'],mpop:[82,'Q'],peek:[83,'K'],clr:[84,'N'],fadd:[96,'F'],fsub:[97,'F'],fmul:[98,'F'],fdiv:[99,'F'],fcmp:[100,'D'],sqrt:[101,'U'],fabs:[102,'U'],sin:[103,'U'],cos:[104,'U'],vadd:[112,'F'],vsub:[113,'F'],vdot:[114,'F'],vcrs:[115,'F'],vmag:[116,'U'],vang:[117,'F'],vld:[118,'L'],vst:[119,'T'],nop:[124,'N']};
+const BY={};for(const[k,[o,f]]of Object.entries(T))BY[o]=[k,f];
+const M=n=>(1n<<BigInt(n))-1n,pk=(w,v,h,l)=>w|((BigInt(v)&M(h-l+1))<<BigInt(l)),xf=(w,h,l)=>Number((w>>BigInt(l))&M(h-l+1));
+const sf=(v,b)=>{if(v<-(2**(b-1))||v>2**(b-1)-1)throw Error(`Value ${v} out of range for a ${b}-bit signed field`);return BigInt(v)&M(b)};
+const sx=(r,b)=>r>=2**(b-1)?r-2**b:r;
+const rn=i=>i==29?'ip':i==30?'sp':i==31?'ra':'r'+i;
+const hx=(n,w=8)=>'0x'+(n>>>0).toString(16).padStart(w,'0');
+const isR=s=>/^(r\d+|ip|sp|ra)$/i.test(s);
+function reg(s){if(s===undefined)throw Error('Missing operand');const m=s.match(/^r(\d+)$/i);let n=m?+m[1]:{ip:29,sp:30,ra:31}[s];if(n===undefined||n>31)throw Error('Not a valid register: '+s);return n}
+function imm(s){const m=s.replace(/^#/,'').match(/^(-)?(0x[0-9a-f]+|\d+)$/i);if(!m)throw Error('Not a valid immediate: '+s);return m[1]?-Number(m[2]):Number(m[2])}
+function memop(s){s=s.replace(/\s+/g,'');let m=s.match(/^\[([^+\]]+)\+#?([^\]]+)\]$/),b,o;
+ if(m){b=m[1];o=m[2]}else if(m=s.match(/^([^\[\]]+)\[([^\[\]]+)\]$/)){o=m[1];b=m[2]}else throw Error('Expected memory operand like 4[r2], -4[r2] or [r2 + #4]');
+ const v=imm(o);if(v<-(2**41)||v>2**41-1)throw Error('Memory offset does not fit in signed 42 bits');return[reg(b),v]}
+function enc({mn,ops,addr},sym){
+ const t=T[mn];if(!t)throw Error('Unknown mnemonic: '+mn);const[op,f]=t,n=ops.length,R=i=>reg(ops[i]),V=i=>{const r=reg(ops[i]);return r==20?0:r==23?1:r==26?2:r};let w=pk(0n,op,63,57);
+ const need=k=>{if(n!==k)throw Error(`${mn}: expected ${k} operand(s)`)},p=(v,h,l)=>{w=pk(w,v,h,l)};
+ switch(f){
+ case'R':need(3);p(R(0),56,52);p(R(1),51,47);if(isR(ops[2]))p(R(2),46,42);else{p(1,41,41);p(sf(imm(ops[2]),41),40,0)}break;
+ case'C':need(2);p(R(0),51,47);if(isR(ops[1]))p(R(1),46,42);else{p(1,41,41);p(sf(imm(ops[1]),41),40,0)}break;
+ case'U':if(mn=='not'){if(n==2){p(R(0),56,52);p(R(1),51,47)}else{need(1);p(R(0),56,52);p(R(0),51,47)}}else{need(2);p(R(0),56,52);p(mn=='vmag'?V(1):R(1),51,47)}break;
+ case'S':need(1);p(R(0),51,47);break;
+ case'B':{need(3);const b=imm(ops[2]);if(b<0||b>31)throw Error('Bit index must be 0-31');p(R(0),56,52);p(R(1),51,47);p(b,46,42);break}
+ case'J':{need(1);const o=ops[0] in sym?sym[ops[0]]-addr:imm(ops[0]);p(sf(o,42),41,0);break}
+ case'N':need(0);break;
+ case'L':case'T':{const v=mn[0]=='v';let base,off;const r0=v?V(0):R(0);
+  if(n==2)[base,off]=memop(ops[1]);else if(n==3&&v){base=R(1);off=imm(ops[2])}
+  else throw Error(v?`${mn}: expected vs, [base + #offset] (or vs, rs1, #offset)`:`${mn}: expected ${mn=='ld'?'rd':'rs'}, offset[base]`);
+  if(f=='L'){p(r0,56,52);p(base,51,47)}else{p(base,56,52);p(r0,51,47)}
+  p(sf(off,42),41,0);break}
+ case'M':need(2);p(R(0),56,52);if(isR(ops[1]))p(R(1),46,42);else{p(1,41,41);p(sf(imm(ops[1]),39),38,0)}break;
+ case'K':need(1);p(R(0),56,52);break;
+ case'Q':need(1);p(sf(imm(ops[0]),42),41,0);break;
+ case'F':need(3);{const vv=mn[0]=='v',sc=mn=='vdot'||mn=='vang';p(vv&&!sc?V(0):R(0),56,52);p(vv?V(1):R(1),51,47);p(vv?V(2):R(2),46,42)}break;
+ case'D':need(2);p(R(0),51,47);p(R(1),46,42);break}
+ return w}
+function asm(src){const rows=[],errs=[],errs0=errs,sym={},words=[];
+ src.split('\n').forEach((s,i)=>{s=s.split(';')[0].trim();const c=s.indexOf(':');if(c>=0){sym[s.slice(0,c).trim()]=rows.length*8;s=s.slice(c+1).trim()}
+  if(s){const m=s.match(/^(\S+)\s*(.*)$/),mn=m[1].toLowerCase(),ops=m[2]?m[2].split(',').map(x=>x.trim()):[];
+   // stack macros: pushm r1, r2, r3 -> push r1 / push r2 / push r3;  popm r1, r2, r3 -> pop r3 / pop r2 / pop r1
+   // (push r1, r2 and pop r1, r2 are expanded in the order written)
+   if((mn=='pushm'||mn=='popm'||((mn=='push'||mn=='pop')&&ops.length>1))){
+    const rev=mn=='popm',one=mn[0]=='p'&&mn[1]=='u'?'push':'pop';
+    if(!ops.length||ops.some(x=>!isR(x))){errs0.push(`Line ${i+1}: error: ${mn}: expected one or more registers`);return}
+    (rev?[...ops].reverse():ops).forEach(r=>rows.push({ln:i+1,mn:one,ops:[r],addr:rows.length*8}))}
+   else rows.push({ln:i+1,mn,ops,addr:rows.length*8})}});
+ for(const r of rows){try{words.push(enc(r,sym))}catch(e){errs.push(`Line ${r.ln}: error: ${e.message}`);words.push(0n)}}
+ return{rows,words,errs,sym}}
+function dec(w){const op=xf(w,63,57),e=BY[op],d={w,op,valid:!!e};if(!e)return d;[d.mn,d.f]=e;
+ const rd=xf(w,56,52),r1=xf(w,51,47),r2=xf(w,46,42),I=xf(w,41,41),i42=sx(xf(w,41,0),42);
+ switch(d.f){
+ case'R':case'C':if(d.f=='R')d.rd=rd;d.rs1=r1;d.I=I;if(I)d.imm=sx(xf(w,40,0),41);else d.rs2=r2;break;
+ case'U':d.rd=rd;d.rs1=r1;break;case'S':d.rs1=r1;break;
+ case'B':d.rd=rd;d.rs1=r1;d.bit=r2;break;
+ case'J':case'Q':d.imm=i42;break;
+ case'L':case'T':d.rd=rd;d.rs1=r1;d.imm=i42;break;
+ case'M':d.rd=rd;d.I=I;d.mode=xf(w,40,39);if(I)d.imm=sx(xf(w,38,0),39);else d.rs2=r2;break;
+ case'K':d.rd=rd;break;
+ case'F':d.rd=rd;d.rs1=r1;d.rs2=r2;break;
+ case'D':d.rs1=r1;d.rs2=r2;break}
+ return d}
+const vn=i=>i<=2?'r'+(20+3*i):rn(i);
+function dis(d){if(!d.valid)return'.word '+hx(Number(d.w&0xffffffffn),8);const o=d.mn,s=d.imm,x=d.I?'#'+s:rn(d.rs2);
+ switch(d.f){case'R':return`${o} ${rn(d.rd)}, ${rn(d.rs1)}, ${x}`;case'C':return`${o} ${rn(d.rs1)}, ${x}`;case'U':return o=='vmag'?`${o} ${rn(d.rd)}, ${vn(d.rs1)}`:`${o} ${rn(d.rd)}, ${rn(d.rs1)}`;
+ case'S':return`${o} ${rn(d.rs1)}`;case'B':return`${o} ${rn(d.rd)}, ${rn(d.rs1)}, #${d.bit}`;case'J':case'Q':return`${o} #${s}`;
+ case'L':return o=='ld'?`${o} ${rn(d.rd)}, ${s}[${rn(d.rs1)}]`:`${o} ${vn(d.rd)}, ${rn(d.rs1)}, #${s}`;case'T':return o=='st'?`${o} ${rn(d.rs1)}, ${s}[${rn(d.rd)}]`:`${o} ${vn(d.rs1)}, ${rn(d.rd)}, #${s}`;case'M':return`mov ${rn(d.rd)}, ${x}`;
+ case'K':return`${o} ${rn(d.rd)}`;case'F':if(o[0]=='v')return o=='vdot'||o=='vang'?`${o} ${rn(d.rd)}, ${vn(d.rs1)}, ${vn(d.rs2)}`:`${o} ${vn(d.rd)}, ${vn(d.rs1)}, ${vn(d.rs2)}`;return`${o} ${rn(d.rd)}, ${rn(d.rs1)}, ${rn(d.rs2)}`;case'D':return`${o} ${rn(d.rs1)}, ${rn(d.rs2)}`;default:return o}}
+const pcnt=a=>{let c=0;a>>>=0;while(a){c+=a&1;a>>>=1}return c};
+const A={add:(a,b)=>a+b|0,sub:(a,b)=>a-b|0,mul:Math.imul,div:(a,b)=>b?Math.trunc(a/b)|0:0,mod:(a,b)=>b?a%b|0:0,
+ pow:(a,b)=>{if(b<0)return 0;let r=1;while(b>0){if(b&1)r=Math.imul(r,a);a=Math.imul(a,a);b>>=1}return r},
+ and:(a,b)=>a&b,or:(a,b)=>a|b,nor:(a,b)=>~(a|b),nand:(a,b)=>~(a&b),xor:(a,b)=>a^b,
+ lsl:(a,n)=>n<0||n>=32?0:a<<n,lsr:(a,n)=>n<0||n>=32?0:a>>>n|0,asr:(a,n)=>n<0||n>=32?0:a>>n,
+ rotl:(a,n)=>n<0||n>=32?0:n?(a<<n|a>>>32-n)|0:a,rotr:(a,n)=>n<0||n>=32?0:n?(a>>>n|a<<32-n)|0:a};
+const MEMSZ=0x10000; // 64 KB data memory (separate from instruction memory); the stack starts at the top and grows down
+class NI extends Error{}
+function chkw(a){if(a<0||a+4>MEMSZ)throw Error('Memory access out of range: '+hx(a,4));if(a%4)throw Error('Misaligned word access at '+hx(a,4)+' (address must be a multiple of 4)')}
+function mr(a){chkw(a);const m=S.mem;return m[a]<<24|m[a+1]<<16|m[a+2]<<8|m[a+3]}
+function mwr(a,v){chkw(a);const m=S.mem;m[a]=v>>24&255;m[a+1]=v>>16&255;m[a+2]=v>>8&255;m[a+3]=v&255}
+function macc(c){const x=c.x;let t='';if(x.ml){c.mv=mr(x.ml[1]);t+=`read memory[${hx(x.ml[1],4)}] = ${c.mv}<br>`}if(x.rt!==null){c.rv=[mr(x.rt),mr(x.rt+4)];t+=`read return address ${hx(c.rv[0],4)} and saved ra ${c.rv[1]} from ${hx(x.rt,4)}<br>`}if(x.mw){mwr(x.mw[0],x.mw[1]);t+=`write memory[${hx(x.mw[0],4)}] ← ${x.mw[1]}<br>`}if(x.mw2){mwr(x.mw2[0],x.mw2[1]);t+=`write memory[${hx(x.mw2[0],4)}] ← ${x.mw2[1]}<br>`}if(x.lv){c.mvv=[0,4,8].map(k=>mr(x.lv[1]+k));t+=`read 3 words from ${hx(x.lv[1],4)}: ${c.mvv.join(', ')}<br>`}if(x.sv){x.sv[1].forEach((v,i)=>mwr(x.sv[0]+4*i,v));t+=`write 3 words to ${hx(x.sv[0],4)}: ${x.sv[1].join(', ')}<br>`}return t}
+const F32=new Float32Array(1),I32=new Int32Array(F32.buffer),fv=v=>{I32[0]=v;return F32[0]},fb=x=>{F32[0]=x;return I32[0]},fr=Math.fround;
+function vreg(m,id,what){if(!(id>=0&&id<=2))throw Error(`${m}: ${what} = r${id} is not a valid vector id; vector operands must be r20 (v1), r23 (v2) or r26 (v3)`);return 20+3*id}
+function vexec(d,m){const R=i=>fv(S.r[i]),o=(b,i)=>R(b+i);let wr=null,wv=null,txt='',lv=null,sv=null;
+ const V3=()=>{const D=vreg(m,d.rd,'vd'),A=vreg(m,d.rs1,'vs1'),B=vreg(m,d.rs2,'vs2');return[D,A,B]};
+ if(m=='vadd'||m=='vsub'){const[D,A,B]=V3();wv=[0,1,2].map(i=>[D+i,fb(fr(m=='vadd'?o(A,i)+o(B,i):o(A,i)-o(B,i)))]);txt=`${m}: v${d.rd+1} = v${d.rs1+1} ${m=='vadd'?'+':'−'} v${d.rs2+1}, one FPU ${m=='vadd'?'FADD':'FSUB'} per component → (${wv.map(w=>fv(w[1])).join(', ')})`}
+ else if(m=='vcrs'){const[D,A,B]=V3(),a=i=>o(A,i),b=i=>o(B,i),c=(p,q,r,s)=>fr(fr(a(p)*b(q))-fr(a(r)*b(s)));wv=[[D,fb(c(1,2,2,1))],[D+1,fb(c(2,0,0,2))],[D+2,fb(c(0,1,1,0))]];txt=`vcrs: v${d.rd+1} = v${d.rs1+1} × v${d.rs2+1} using 6 FMUL and 3 FSUB → (${wv.map(w=>fv(w[1])).join(', ')})`}
+ else if(m=='vdot'||m=='vang'||m=='vmag'){const A=vreg(m,d.rs1,'vs1'),B=m=='vmag'?A:vreg(m,d.rs2,'vs2'),dot=(p,q)=>fr(fr(fr(o(p,0)*o(q,0))+fr(o(p,1)*o(q,1)))+fr(o(p,2)*o(q,2)));
+  let r;if(m=='vdot'){r=dot(A,B);txt=`vdot: 3 FMUL + 2 FADD → ${r}`}else if(m=='vmag'){r=fr(Math.sqrt(dot(A,A)));txt=`vmag: sqrt(v·v) → ${r}`}else{const c=fr(dot(A,B)/fr(fr(Math.sqrt(dot(A,A)))*fr(Math.sqrt(dot(B,B)))));r=fr(Math.acos(fr(c)));txt=`vang: acos(a·b / (|a|·|b|)) = acos(${c}) → ${r} rad`}
+  wr=[d.rd,fb(r)]}
+ else if(m=='vld'||m=='vst'){const id=m=='vld'?d.rd:d.rs1,V=vreg(m,id,m=='vld'?'vd':'vs'),base=m=='vld'?S.r[d.rs1]:S.r[d.rd],ad=base+d.imm;[0,4,8].forEach(k=>chkw(ad+k));
+  if(m=='vld'){lv=[V,ad];txt=`address ${hx(ad,4)} = ${base} + ${d.imm}; three words are read into r${V}, r${V+1}, r${V+2} in MA`}else{sv=[ad,[0,1,2].map(i=>S.r[V+i])];txt=`address ${hx(ad,4)} = ${base} + ${d.imm}; r${V}, r${V+1}, r${V+2} are written in MA`}}
+ return{wr,wv,lv,sv,txt}}
+function exec(c){const d=c.d,pc=c.pc,a=c.a,b=c.b,f=d.f,m=d.mn;let next=pc+8,wr=null,wr2=null,mw=null,ml=null,mw2=null,rt=null,fl=null,txt='';
+ if(f=='R'){const r=A[m](a,b);wr=[d.rd,r];txt=`${m}(${a}, ${b}) = ${r}`}
+ else if(f=='C'){const e=a==b,g=a>b;fl=[+e,+g,+(!e&&!g)];txt=`compare ${a} with ${b} → E=${fl[0]} GT=${fl[1]} ST=${fl[2]}`}
+ else if(f=='U'&&(m=='not'||m=='pcnt')){const r=m=='not'?~a:pcnt(a);wr=[d.rd,r];txt=`${m}(${a}) = ${r}`}
+ else if(f=='S'){const r=m=='incr'?a+1|0:m=='decr'?a-1|0:a<0?-a|0:a;wr=[d.rs1,r];txt=`${m}(${a}) = ${r}`}
+ else if(f=='B'){const u=a>>>0,k=1<<d.bit,r=(m=='tog'?u^k:m=='sbit'?u|k:u&~k)|0;wr=[d.rd,r];txt=`${m}(${a}, bit ${d.bit}) = ${r}`}
+ else if(f=='J'){const take=m=='b'||m=='call'||(m=='beq'&&S.e)||(m=='bgt'&&S.g)||(m=='bst'&&S.s);
+  if(take){const t=pc+d.imm;if(t<0||t>0xFFFFFFFF)throw Error('Branch target out of range');next=t}
+  if(m=='call'){const sp=c.sp>>>0;if(sp<8||sp>MEMSZ)throw Error('Stack overflow (data memory is full)');mw=[sp-4,c.ra];mw2=[sp-8,pc+8];wr=[30,sp-8];wr2=[31,pc+8]}
+  txt=take?`condition true → target ip + ${d.imm} = ${hx(next,4)}`:`condition false → fall through to ${hx(next,4)}`}
+ else if(f=='M'){if(d.mode)throw new NI(`mov mode ${d.mode} (unsigned/movh) is not implemented yet`);wr=[d.rd,b];txt=`move ${b}`}
+ else if(f=='N'&&m=='nop')txt='no operation';
+ else if(m=='ld'){const ad=a+d.imm;chkw(ad);ml=[d.rd,ad];txt=`address ${hx(ad,4)} = ${a} + ${d.imm}; the word is read in WB`}
+ else if(m=='st'){const ad=a+d.imm;chkw(ad);mw=[ad,b];txt=`address ${hx(ad,4)} = ${a} + ${d.imm}; ${b} is written in WB`}
+ else if(m=='push'){const sp=c.sp>>>0;if(sp<4||sp>MEMSZ)throw Error('Stack overflow (data memory is full)');mw=[sp-4,a];wr=[30,sp-4];txt=`push ${a} at ${hx(sp-4,4)}: sp ${sp} → ${sp-4}`}
+ else if(m=='pop'||m=='peek'){const sp=c.sp>>>0;if(sp+4>MEMSZ)throw Error('Stack underflow (stack is empty)');ml=[d.rd,sp];if(m=='pop')wr2=[30,sp+4];txt=`${m}: word at ${hx(sp,4)} is read`+(m=='pop'?`; sp → ${sp+4}`:'')}
+ else if(m=='mpop'){const k=d.imm;if(k<0||(c.sp>>>0)+4*k>MEMSZ)throw Error('Stack underflow (mpop count too large)');wr=[30,(c.sp>>>0)+4*k];txt=`discard ${k} word(s): sp → ${wr[1]}`}
+ else if(m=='clr'){wr=[30,MEMSZ];txt='clear the stack: sp → '+MEMSZ}
+ else if(m=='ret'){const sp=c.sp>>>0;if(sp+8>MEMSZ)throw Error('Stack underflow (ret needs a return address and the saved ra)');rt=sp;wr=[30,sp+8];txt=`return: pop the return address and the saved ra from ${hx(sp,4)}`}
+ else if(/^v(add|sub|dot|crs|mag|ang|ld|st)$/.test(m)){const v=vexec(d,m);return{wr:v.wr,wv:v.wv,lv:v.lv,sv:v.sv,wr2:null,mw:null,mw2:null,ml:null,rt:null,fl:null,next,txt:v.txt}}
+ else throw new NI(`'${m}' is not implemented yet`);
+ return{wr,wr2,mw,mw2,ml,rt,fl,next,txt}}
+const $=id=>document.getElementById(id),h=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let P=[],rows=[],sym={},S,bps=new Set(),timer=null,dirty=true,first=false;
+const NM={4:['IF','OF','EX','MA+RW'],6:['IF','ID','RR','EX','MA','RW']};
+const PH={4:['IF','DEC','EX','WB'],6:['IF','DEC','RR','EX','MA','WB']};
+const DESC={IF:'Fetch the instruction using the ip',OF:'Decode and read source operands',ID:'Decode, find register fields, make control signals',RR:'Read source registers',EX:'ALU, address calculation, branch test','MA+RW':'Memory access, then register write-back',MA:'Data-memory access',RW:'Register write-back'};
+let MODE=4,NAMES=NM[4];
+function out(t,cls=''){const e=document.createElement('div');e.textContent=t;if(cls)e.className=cls;$('log').append(e);$('log').scrollTop=1e9}
+function stat(t,cls='mu'){$('status').textContent=t;$('status').className=cls}
+function reset(){pause();S={mem:new Uint8Array(MEMSZ),r:new Int32Array(32),e:0,g:0,s:0,stg:0,last:-1,cur:null,halt:null,steps:0,chg:new Set(),t:[],snap:null,pf:[0,0,0]};
+ S.r[30]=MEMSZ;$('log').textContent='';stat(P.length?'Ready':'No program');draw()}
+function build(){const a=asm($('src').value);P=[];rows=[];sym={};dirty=false;
+ if(a.errs.length){reset();a.errs.forEach(e=>out(e,'er'));stat('Assembly failed','er');renderList();return false}
+ P=a.words;rows=a.rows;sym=a.sym;reset();out(`Assembled ${P.length} instruction(s), ${P.length*8} bytes.`,'mu');renderList();return true}
+function renderList(){const lb={};for(const k in sym)(lb[sym[k]]??=[]).push(k+':');
+ $('ls').innerHTML=P.map((w,i)=>{const a=i*8,d=dec(w);return`<tr class="r" data-a="${a}"><td class="bp">${bps.has(a)?'●':''}</td><td>${hx(a,4)}</td><td class="mu">${w.toString(16).padStart(16,'0')}</td><td class="mu">${lb[a]?h(lb[a].join(' ')):''}</td><td>${h(dis(d))}</td></tr>`}).join('');
+ draw()}
+function halt(kind,msg){S.halt=kind;if(kind=='end'){stat('Halted: end of program','ok');out('— end of program —','ok')}else{stat('Stopped: '+(kind=='ni'?'not implemented':'error'),'er');out(msg,'er')}
+ const nz=[];for(let i=0;i<32;i++)if(i!=29&&S.r[i])nz.push(`${rn(i)}=${S.r[i]}`);out('Registers: '+(nz.join('  ')||'all zero')+`   | ${S.steps} instruction(s) executed`,'ok')}
+function tick(){if(S.halt)return;const stg=S.stg,ph=PH[MODE][stg],NS=NAMES.length;let pc=S.r[29]>>>0;
+ try{
+ if(ph=='IF'){S.t=[];S.chg=new Set();S.fchg=false;S.snap=S.r.slice();S.pf=[S.e,S.g,S.s];
+  if(pc%8==0&&pc/8>=P.length){S.last=0;return halt('end')}
+  if(pc%8)throw Error('Misaligned ip '+hx(pc,4));
+  S.cur={pc,w:P[pc/8]};S.t[0]=`ip = <b>${hx(pc,4)}</b><br>word = <code>${S.cur.w.toString(16).padStart(16,'0')}</code><br><span class="mu">next ip = ip + 8</span>`}
+ else if(ph=='DEC'){const c=S.cur,d=c.d=dec(c.w);if(!d.valid)throw Error('Unknown opcode 0x'+d.op.toString(16));const R=i=>S.r[i];
+  if(d.f=='R'||d.f=='C')c.a=R(d.rs1),c.b=d.I?d.imm|0:R(d.rs2);else if('USB'.includes(d.f))c.a=R(d.rs1);else if(d.f=='L')c.a=R(d.rs1);else if(d.f=='T'){c.a=R(d.rd);c.b=R(d.rs1)}else if(d.f=='K')c.a=R(d.rd);else if(d.f=='M')c.b=d.I?d.imm|0:R(d.rs2);
+  c.sp=R(30);c.ra=R(31);
+  const fs=['rd','rs1','rs2','imm','bit','mode'].filter(k=>d[k]!==undefined).map(k=>`${k}=${d[k]}`).join(' ');
+  S.t[stg]=`<b>${h(dis(d))}</b><br>opcode ${hx(d.op,2)} · type ${d.f}<br>${fs}`+(MODE==4?'<br>'+(c.a!==undefined?`A=${c.a} `:'')+(c.b!==undefined?`B=${c.b}`:''):'')}
+ else if(ph=='RR'){const c=S.cur;S.t[stg]=(c.a!==undefined||c.b!==undefined)?(c.a!==undefined?`A = ${c.a}<br>`:'')+(c.b!==undefined?`B = ${c.b}`:''):'<span class="mu">no source registers</span>'}
+ else if(ph=='EX'){const c=S.cur;c.x=exec(c);S.t[stg]=h(c.x.txt)}
+ else if(ph=='MA'){const c=S.cur,t=macc(c);S.t[stg]=t||'<span class="mu">no data-memory access</span>'}
+ else{const c=S.cur,x=c.x;if(x.wr)S.r[x.wr[0]]=x.wr[1];if(x.wv)x.wv.forEach(w=>S.r[w[0]]=w[1]);if(x.wr2)S.r[x.wr2[0]]=x.wr2[1];let mt='';if(MODE==4)mt=macc(c);if(x.ml)S.r[x.ml[0]]=c.mv;if(x.lv)c.mvv.forEach((v,i)=>S.r[x.lv[0]+i]=v);if(x.rt!==null){x.next=c.rv[0];S.r[31]=c.rv[1]}if(x.fl)[S.e,S.g,S.s]=x.fl;
+  let nx=x.next;if((S.r[29]>>>0)!=c.pc)nx=S.r[29]>>>0;S.r[29]=nx|0;S.steps++;
+  const parts=[];for(let i=0;i<32;i++)if(S.r[i]!=S.snap[i]){S.chg.add(i);if(i!=29)parts.push(`${rn(i)}: ${S.snap[i]} → ${S.r[i]}`)}
+  if([S.e,S.g,S.s].some((v,i)=>v!=S.pf[i])){S.fchg=true;parts.push(`flags E=${S.e} GT=${S.g} ST=${S.s}`)}
+  S.t[stg]=(x.wr?`<b>${rn(x.wr[0])}</b> ← ${x.wr[1]}`:(x.ml||x.mw||x.wr2||x.rt!==null?'':'no register written'))+(x.wr2?`<br><b>${rn(x.wr2[0])}</b> ← ${x.wr2[1]}`:'')+(x.ml?`<br><b>${rn(x.ml[0])}</b> ← memory[${hx(x.ml[1],4)}] = ${S.r[x.ml[0]]}`:'')+(MODE==4&&mt?'<br>'+mt.replace(/<br>$/,''):'')+(x.fl?`<br>flags ← E=${x.fl[0]} GT=${x.fl[1]} ST=${x.fl[2]}`:'')+`<br>ip ← <b>${hx(nx,4)}</b>`;
+  out(`${hx(c.pc,4)}  ${dis(c.d).padEnd(22)}${parts.length?'| '+parts.join(', '):''}`)}
+ S.last=stg;S.stg=(stg+1)%NS;stat(`${NAMES[stg]} · step ${S.steps+(stg<NS-1?1:0)}`,'mu')
+ }catch(e){S.last=stg;S.stg=0;halt(e instanceof NI?'ni':'err',`${e.message} at ${hx(pc,4)}`)}}
+function draw(){const c=$('regs').children;
+ for(let i=0;i<32;i++){c[i].children[1].textContent=S.r[i];c[i].children[2].textContent=hx(S.r[i]);c[i].classList.toggle('chg',S.chg.has(i))}
+ [['fe','e'],['fg','g'],['fs','s']].forEach(([id,k])=>$(id).classList.toggle('on',!!S[k]));
+ for(let i=0;i<NAMES.length;i++){const b=$('sb'+i);b.classList.toggle('on',S.last==i);b.lastChild.innerHTML=S.t[i]||'<span class="mu">—</span>'}
+ const ip=S.r[29]>>>0;document.querySelectorAll('#ls tr').forEach(t=>{t.classList.toggle('cur',+t.dataset.a==ip&&!S.halt||(S.halt&&+t.dataset.a==ip));t.children[0].textContent=bps.has(+t.dataset.a)?'●':''});
+ {const sp=S.r[30]>>>0;let t='';if(sp%4||sp>MEMSZ)t='sp is outside data memory!';else if(sp==MEMSZ)t='(empty)';else for(let a=sp,k=0;a<MEMSZ&&k<12;a+=4,k++){t+=`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${mr(a)}${k==0?'   ← top (sp)':''}\n`}$('stk').textContent=t;
+  const b=(parseInt($('ma').value,16)||0)&~3;let u='';for(let k=0;k<8;k++){const a=b+4*k;u+=a+4<=MEMSZ&&a>=0?`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${mr(a)}\n`:''}$('mem').textContent=u||'(out of range)'}
+ $('cnt').textContent=`· ${S.steps} instruction(s) executed`}
+function prep(){if(dirty&&!build())return false;return !S.halt&&P.length>0}
+function pause(){clearInterval(timer);timer=null;$('bRun').textContent='▶ Run'}
+function start(){clearInterval(timer);$('bRun').textContent='⏸ Pause';
+ timer=setInterval(()=>{if(S.halt)return pause();
+  if(S.stg==0){if(!first&&bps.has(S.r[29]>>>0)){pause();stat('Paused at breakpoint','mu');return out('Breakpoint at '+hx(S.r[29],4),'mu')}first=false}
+  tick();draw();if(S.halt)pause()},Math.max(10,1000-$('spd').value*10))}
+$('bS').onclick=()=>{if(prep()){tick();draw()}};
+$('bI').onclick=()=>{if(prep()){do tick();while(!S.halt&&S.stg!=0);draw()}};
+$('bRun').onclick=()=>{if(timer)return pause();if(prep()){first=true;start()}};
+$('bR').onclick=()=>{if(dirty)build();else reset()};
+$('bA').onclick=build;
+$('ma').oninput=draw;
+$('spd').oninput=()=>{if(timer)start()};
+$('src').oninput=()=>{dirty=true;pause()};
+$('ls').onclick=e=>{const t=e.target.closest('tr');if(!t)return;const a=+t.dataset.a;bps.has(a)?bps.delete(a):bps.add(a);draw()};
+const EX={'Recursive factorial (call/ret + loop)':`; recursive factorial(10) with activation blocks, then iterative 5! pushed on stack
+mov r0, 10
+call .factorial
+mov r6, r1       ; keep 10! in r6
+mov r1, 1
+mov r3, 5
+loop:
+mul r1, r1, r3
+decr r3
+cmp r3, 0
+bgt loop
+push r1
+b .end
+.factorial:
+cmp r0, 1
+beq .return
+bgt .continue
+b .return
+.continue:
+sub sp, sp, 8
+st r0, 0[sp]
+st ra, 4[sp]
+sub r0, r0, 1
+call .factorial
+ld r0, 0[sp]
+ld ra, 4[sp]
+mul r1, r0, r1
+add sp, sp, 8
+ret
+.return:
+mov r1, 1
+ret
+.end:
+nop`,'Factorial of 5 (from the repo)':`; 5! = 120, pushed onto the stack at the end
+mov r1, 1        ; result = 1
+mov r2, 5        ; counter = 5
+loop:
+mul r1, r1, r2   ; result *= counter
+decr r2          ; counter--
+cmp r2, 0
+bgt loop         ; repeat while counter > 0
+push r1
+nop`,
+'Sum of 1 to 10':`; r1 = 1 + 2 + ... + 10 = 55
+mov r1, 0
+mov r2, 10
+loop: add r1, r1, r2
+decr r2
+cmp r2, 0
+bgt loop`,
+'Bit operations':`mov r1, 0xF0F0
+pcnt r2, r1       ; population count
+lsl r3, r1, 4     ; shift left
+xor r4, r1, r3
+rotr r5, r1, 8    ; rotate right
+sbit r6, r0, 31   ; set the sign bit
+asr r7, r6, 28    ; arithmetic shift keeps the sign`,
+'Load and store':`; data memory: st rs, offset[base]   ld rd, offset[base]
+mov r1, 100
+mov r2, 0x2000
+st r1, 0[r2]
+st r1, 4[r2]
+ld r3, 4[r2]
+add r3, r3, 1
+st r3, 8[r2]
+ld r4, 8[r2]`,
+'Stack and call/ret':`; call saves the return address in ra; ret jumps back to it
+mov r1, 6
+call square
+push r1          ; push 36
+mov r1, 0
+pop r2           ; r2 = 36
+b end
+square: mul r1, r1, r1
+ret
+end: nop`,
+'Count down with beq':`mov r1, 3
+top: decr r1
+cmp r1, 0
+beq done
+b top
+done: mov r2, 99`};
+function buildStages(){NAMES=NM[MODE];$('stg').className='stg'+(MODE==6?' six':'');$('stg').innerHTML=NAMES.map((n,i)=>`<div class="sb" id="sb${i}"><h3>${n}</h3><div class="mu" style="font-size:11px">${DESC[n]}</div><div></div></div>`).join('')}
+buildStages();
+$('pm').onchange=()=>{MODE=+$('pm').value;buildStages();if(S.stg||S.cur){reset();build()}else draw()};
+$('regs').innerHTML=Array.from({length:32},(_,i)=>`<div class="rg"><span>${i<20?'r'+i:i<29?`r${i} vec${(i-20)/3|0}${'xyz'[(i-20)%3]}`:rn(i)+' (r'+i+')'}</span><b>0</b><i>0x0</i></div>`).join('');
+$('ex').innerHTML=Object.keys(EX).map(k=>`<option>${h(k)}</option>`).join('');
+$('ex').onchange=()=>{$('src').value=EX[$('ex').value];bps.clear();build()};
+$('src').value=EX[$('ex').value];build();
+</script></body></html>
