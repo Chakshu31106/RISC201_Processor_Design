@@ -43,7 +43,7 @@ add_executable(assembler_cli src/Assembler/risc201_assembler.cpp)   # .asm -> .h
 set_target_properties(assembler_cli PROPERTIES OUTPUT_NAME assembler)
 target_link_libraries(assembler_cli PRIVATE assembler)
 
-# Team's standalone pipeline timing tool (own parser, includes <bits/stdc++.h>, so GCC/Clang only).
+# Standalone pipeline timing tool (own parser, includes <bits/stdc++.h>, so GCC/Clang only).
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_executable(isa_sim src/Simulator/isa_pipeline_sim.cpp)
   target_compile_options(isa_sim PRIVATE -O2)
