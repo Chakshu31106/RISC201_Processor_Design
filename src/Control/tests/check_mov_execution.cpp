@@ -43,7 +43,3 @@ int main() {
     return 0;
 }
 
-    std::cout << "\nAll MOV tests passed.\n";
-
-    return 0;
-}
