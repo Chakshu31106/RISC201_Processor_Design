@@ -14,7 +14,7 @@ build/bin/assembler programs/examples/factorial5_loop.asm out.hex
 build/bin/disassembler out.hex
 build/bin/processor programs/examples/factorial5_loop.asm      # debugger (type "help")
 build/bin/processor --run --perf programs/examples/factorial.asm    # run + 4-/6-stage timing table (add --fwd for forwarding)
-build/bin/isa_sim programs/examples/factorial.asm [-f]           # team's standalone timing tool (GCC/Clang only)
+build/bin/isa_sim programs/examples/factorial.asm [-f]           # standalone timing tool (GCC/Clang only)
 ```
 
 `docs/simulator.html` is a standalone in-browser simulator (open it in any browser).
