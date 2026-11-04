@@ -12,7 +12,7 @@ option(BUILD_TESTS "Build the test suites" ON)
 # also on the include path because the control-unit files and tests use bare names such as "control_unit.h".
 add_library(project_options INTERFACE)
 target_include_directories(project_options INTERFACE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/Control)
-# risc201_common.h carries its own definitions; only risc201_common.cpp compiles them (see that file).
+# risc201_common.h carries its own definitions; only the "assembler" library below compiles them.
 target_compile_definitions(project_options INTERFACE RISC201_COMMON_NO_IMPLEMENTATION)
 target_compile_options(project_options INTERFACE
   $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra>)
@@ -31,7 +31,11 @@ add_lib(isa         ISA)
 add_lib(alu         ALU/alu)
 add_lib(fpu         ALU/fpu)
 add_lib(datapath    datapath      isa)
-add_lib(assembler   Assembler)
+# The assembler library is risc201_common.h compiled once (the header carries its own definitions).
+file(WRITE ${CMAKE_BINARY_DIR}/generated/risc201_common_impl.cpp
+  "#undef RISC201_COMMON_NO_IMPLEMENTATION\n#include \"Assembler/risc201_common.h\"\n")
+add_library(assembler STATIC ${CMAKE_BINARY_DIR}/generated/risc201_common_impl.cpp)
+target_link_libraries(assembler PUBLIC project_options)
 add_lib(control     Control       isa alu fpu datapath)
 add_lib(simulator   Simulator     isa alu fpu datapath assembler control)
 
