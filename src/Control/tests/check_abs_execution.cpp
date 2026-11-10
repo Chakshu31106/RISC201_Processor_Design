@@ -17,10 +17,9 @@ int main() {
 
         cu.loadProgram(program);
 
-        // ABS R2, R1
+        // ABS R1 (single-register, in place: the assembler's R1S format has no rd field)
         const std::uint64_t absInstruction =
             (static_cast<std::uint64_t>(control::isa::ABS) << 57)
-            | (static_cast<std::uint64_t>(2) << 52)
             | (static_cast<std::uint64_t>(1) << 47);
 
         // Test 1: ABS(-5) = 5.
@@ -28,7 +27,7 @@ int main() {
         cu.loadInstruction(absInstruction, 0);
         cu.executeInstruction();
 
-        const std::int32_t negativeResult = cu.readRegister(2);
+        const std::int32_t negativeResult = cu.readRegister(1);
 
         std::cout << "ABS(-5) = " << negativeResult << '\n';
 
@@ -42,7 +41,7 @@ int main() {
         cu.loadInstruction(absInstruction, 0);
         cu.executeInstruction();
 
-        const std::int32_t positiveResult = cu.readRegister(2);
+        const std::int32_t positiveResult = cu.readRegister(1);
 
         std::cout << "ABS(5) = " << positiveResult << '\n';
 
@@ -56,7 +55,7 @@ int main() {
         cu.loadInstruction(absInstruction, 0);
         cu.executeInstruction();
 
-        const std::int32_t zeroResult = cu.readRegister(2);
+        const std::int32_t zeroResult = cu.readRegister(1);
 
         std::cout << "ABS(0) = " << zeroResult << '\n';
 

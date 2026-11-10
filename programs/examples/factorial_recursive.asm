@@ -1,7 +1,7 @@
-; recursive factorial(10) with activation blocks, then iterative 5! pushed on stack
-mov r0, 10
+; recursive factorial(5) with activation blocks, then iterative 5! pushed on stack
+mov r0, 5
 call .factorial
-mov r6, r1       ; keep 10! in r6
+mov r6, r1       ; keep 5! in r6
 mov r1, 1
 mov r3, 5
 loop:

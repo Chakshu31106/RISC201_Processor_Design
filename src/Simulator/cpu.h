@@ -39,8 +39,8 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-// Hardwired (single-cycle style) RISC201 CPU:
-//   fetch(ip) -> decode -> execute through the ALU / register file -> update ip
+// RISC201 CPU:
+//   fetch(ip) -> decode -> run the instruction through the microprogrammed control unit -> update ip
 //
 // Conventions:
 //   * ip (r29) holds the byte address of the instruction being executed.
@@ -105,14 +105,8 @@ public:
     void clear_breakpoints() { breakpoints_.clear(); }
     const std::set<uint32_t>& breakpoints() const { return breakpoints_; }
 
-    // Execution mode. Hardwired (default): CPU::execute does the work directly.
-    // Micro: instructions that have microcode run through the microprogrammed
-    // ControlUnit instead; the ones without microcode yet (push, pop, peek, mpop, clr
-    // and the immediate form of mov) fall back to the hardwired path and are counted.
-    void set_micro_mode(bool on);
-    bool micro_mode() const { return micro_mode_; }
-    uint64_t micro_instructions() const { return micro_count_; }   // ran through microcode
-    uint64_t micro_fallbacks() const { return fallback_count_; }   // ran hardwired in micro mode
+    // Number of instructions executed so far (every one runs through the control unit's microcode).
+    uint64_t micro_instructions() const { return micro_count_; }
 
     // When set, every executed instruction prints one line: address,
     // disassembly, and the registers/flags it changed. Pass nullptr to turn off.
@@ -122,28 +116,20 @@ private:
     // Runs one decoded instruction; returns the next ip.
     uint32_t execute(const DecodedInstr& d, uint32_t pc);
     void halt(StopReason why, const std::string& msg);
-    // Stack helpers (throw std::runtime_error on overflow/underflow).
-    void stack_push(int32_t value);
-    int32_t stack_pop();
-    int32_t stack_peek() const;
-    void stack_drop(int64_t count);
     void require_stack_words(uint32_t words, const char* what) const;
     void check_stack_op(const DecodedInstr& d) const;
     void check_vector_op(const DecodedInstr& d) const;
+    void check_memory_op(const DecodedInstr& d) const;
     uint32_t data_address(int32_t base, int64_t offset) const;
 
     RegisterFile regs_;
-    ALU alu_;
-    FPU fpu_;
     InstructionMemory imem_;
     memory::Memory dmem_{kDataMemorySize};
     std::set<uint32_t> breakpoints_;
     std::ostream* trace_ = nullptr;
 
-    bool micro_mode_ = false;
     std::shared_ptr<MicroExecutor> micro_;   // created on first use; shared by copies
     uint64_t micro_count_ = 0;
-    uint64_t fallback_count_ = 0;
 
     bool halted_ = false;
     StopReason stop_ = StopReason::None;

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -91,6 +92,7 @@ std::string register_name(uint8_t num);
 
 // Parses a decimal or 0x-hex immediate (optional leading '#'), signed.
 int64_t parse_immediate(const std::string& operand);
+int64_t parse_mov_immediate(const std::string& operand);
 
 // ---------------------------------------------------------------------------
 // Bit-field packing / unpacking
@@ -328,6 +330,28 @@ int64_t parse_immediate(const std::string& operand) {
     } catch (...) {
         throw std::runtime_error("Not a valid immediate: " + operand);
     }
+}
+
+// mov accepts an integer (#5, #-3, #0x10) or a float literal (#1.5, #-0.5, #2.5e3). A float literal
+// loads the 32-bit IEEE-754 bit pattern of the number, so it can feed fadd, vadd and the other
+// float instructions directly.
+int64_t parse_mov_immediate(const std::string& operand) {
+    std::string s = operand;
+    if (!s.empty() && s[0] == '#') s = s.substr(1);
+    const bool is_hex = s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
+    if (!is_hex && s.find_first_of(".eE") != std::string::npos) {
+        try {
+            size_t used = 0;
+            float f = std::stof(s, &used);
+            if (used != s.size()) throw std::invalid_argument("trailing text");
+            uint32_t bits;
+            std::memcpy(&bits, &f, sizeof bits);
+            return static_cast<int64_t>(bits);      // 32 bits always fit the 39-bit mov immediate
+        } catch (...) {
+            throw std::runtime_error("Not a valid float literal: " + operand);
+        }
+    }
+    return parse_immediate(operand);
 }
 
 struct MemoryOperand {
@@ -1030,7 +1054,7 @@ return encode_BIT(opcode, parse_register(ops[0]), parse_register(ops[1]),
             if (last_is_reg) {
                 return encode_MOVE_REG(opcode, parse_register(ops[0]), parse_register(ops[1]), /*mode=*/0);
             } else {
-                return encode_MOVE_IMM(opcode, parse_register(ops[0]), /*mode=*/0, parse_immediate(ops[1]));
+                return encode_MOVE_IMM(opcode, parse_register(ops[0]), /*mode=*/0, parse_mov_immediate(ops[1]));
             }
         }
 

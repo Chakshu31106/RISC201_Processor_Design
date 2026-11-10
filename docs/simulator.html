@@ -53,6 +53,7 @@ tr.cur{background:var(--hi)}
 <button id="bI">Step instruction</button>
 <button id="bRun">▶ Run</button>
 <button id="bR">Reset</button>
+<label class="mu">Show <select id="fm" aria-label="Show registers and memory as"><option value="both">int + float</option><option value="int">int</option><option value="float">float</option></select></label>
 <label class="mu">Speed <input id="spd" type="range" min="0" max="95" value="60"></label>
 <span id="status" class="mu">Ready</span>
 </header>
@@ -81,6 +82,9 @@ const hx=(n,w=8)=>'0x'+(n>>>0).toString(16).padStart(w,'0');
 const isR=s=>/^(r\d+|ip|sp|ra)$/i.test(s);
 function reg(s){if(s===undefined)throw Error('Missing operand');const m=s.match(/^r(\d+)$/i);let n=m?+m[1]:{ip:29,sp:30,ra:31}[s];if(n===undefined||n>31)throw Error('Not a valid register: '+s);return n}
 function imm(s){const m=s.replace(/^#/,'').match(/^(-)?(0x[0-9a-f]+|\d+)$/i);if(!m)throw Error('Not a valid immediate: '+s);return m[1]?-Number(m[2]):Number(m[2])}
+// mov accepts an integer (#5, #0x10) or a float literal (#1.5, #-0.5, #2.5e3). A float literal
+// loads the 32-bit IEEE-754 bit pattern, so fadd, vadd and the other float instructions can use it.
+function immMov(s){const t=s.replace(/^#/,'');if(!/^0x/i.test(t)&&/[.eE]/.test(t)){if(!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t))throw Error('Not a valid float literal: '+s);I32[0]=0;F32[0]=parseFloat(t);return I32[0]>>>0}return imm(s)}
 function memop(s){s=s.replace(/\s+/g,'');let m=s.match(/^\[([^+\]]+)\+#?([^\]]+)\]$/),b,o;
  if(m){b=m[1];o=m[2]}else if(m=s.match(/^([^\[\]]+)\[([^\[\]]+)\]$/)){o=m[1];b=m[2]}else throw Error('Expected memory operand like 4[r2], -4[r2] or [r2 + #4]');
  const v=imm(o);if(v<-(2**41)||v>2**41-1)throw Error('Memory offset does not fit in signed 42 bits');return[reg(b),v]}
@@ -100,7 +104,7 @@ function enc({mn,ops,addr},sym){
   else throw Error(v?`${mn}: expected vs, [base + #offset] (or vs, rs1, #offset)`:`${mn}: expected ${mn=='ld'?'rd':'rs'}, offset[base]`);
   if(f=='L'){p(r0,56,52);p(base,51,47)}else{p(base,56,52);p(r0,51,47)}
   p(sf(off,42),41,0);break}
- case'M':need(2);p(R(0),56,52);if(isR(ops[1]))p(R(1),46,42);else{p(1,41,41);p(sf(imm(ops[1]),39),38,0)}break;
+ case'M':need(2);p(R(0),56,52);if(isR(ops[1]))p(R(1),46,42);else{p(1,41,41);p(sf(immMov(ops[1]),39),38,0)}break;
  case'K':need(1);p(R(0),56,52);break;
  case'Q':need(1);p(sf(imm(ops[0]),42),41,0);break;
  case'F':need(3);{const vv=mn[0]=='v',sc=mn=='vdot'||mn=='vang';p(vv&&!sc?V(0):R(0),56,52);p(vv?V(1):R(1),51,47);p(vv?V(2):R(2),46,42)}break;
@@ -180,9 +184,16 @@ function exec(c){const d=c.d,pc=c.pc,a=c.a,b=c.b,f=d.f,m=d.mn;let next=pc+8,wr=n
  else if(m=='mpop'){const k=d.imm;if(k<0||(c.sp>>>0)+4*k>MEMSZ)throw Error('Stack underflow (mpop count too large)');wr=[30,(c.sp>>>0)+4*k];txt=`discard ${k} word(s): sp → ${wr[1]}`}
  else if(m=='clr'){wr=[30,MEMSZ];txt='clear the stack: sp → '+MEMSZ}
  else if(m=='ret'){const sp=c.sp>>>0;if(sp+8>MEMSZ)throw Error('Stack underflow (ret needs a return address and the saved ra)');rt=sp;wr=[30,sp+8];txt=`return: pop the return address and the saved ra from ${hx(sp,4)}`}
+ else if(f=='F'&&m[0]!='v'){const x=fv(a),y=fv(b),r=fb(fr(m=='fadd'?x+y:m=='fsub'?x-y:m=='fmul'?x*y:x/y));wr=[d.rd,r];txt=`${m}(${ft(a)}, ${ft(b)}) = ${ft(r)}`}
+ else if(f=='D'){const x=fv(a),y=fv(b);fl=(isNaN(x)||isNaN(y))?[0,0,0]:x==y?[1,0,0]:x>y?[0,1,0]:[0,0,1];txt=`fcmp ${ft(a)} with ${ft(b)} → E=${fl[0]} GT=${fl[1]} ST=${fl[2]}`}
+ else if(f=='U'&&(m=='sqrt'||m=='fabs'||m=='sin'||m=='cos')){const x=fv(a),r=m=='fabs'?(a&0x7fffffff):fb(fr(m=='sqrt'?Math.sqrt(x):m=='sin'?Math.sin(x):Math.cos(x)));wr=[d.rd,r];txt=`${m}(${ft(a)}) = ${ft(r)}`}
  else if(/^v(add|sub|dot|crs|mag|ang|ld|st)$/.test(m)){const v=vexec(d,m);return{wr:v.wr,wv:v.wv,lv:v.lv,sv:v.sv,wr2:null,mw:null,mw2:null,ml:null,rt:null,fl:null,next,txt:v.txt}}
  else throw new NI(`'${m}' is not implemented yet`);
  return{wr,wr2,mw,mw2,ml,rt,fl,next,txt}}
+let FMT='both';try{FMT=localStorage.getItem('risc201fmt')||'both'}catch(e){}
+const ft=v=>{const x=fv(v);return Number.isFinite(x)?String(Number(x.toPrecision(7))):String(x)};
+// vt: a 32-bit word shown as an integer, a float, or both, depending on the Show selector
+const vt=v=>FMT=='int'?String(v):FMT=='float'?ft(v)+'f':`${v} (${ft(v)}f)`;
 const $=id=>document.getElementById(id),h=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 let P=[],rows=[],sym={},S,bps=new Set(),timer=null,dirty=true,first=false;
 const NM={4:['IF','OF','EX','MA+RW'],6:['IF','ID','RR','EX','MA','RW']};
@@ -200,7 +211,7 @@ function renderList(){const lb={};for(const k in sym)(lb[sym[k]]??=[]).push(k+':
  $('ls').innerHTML=P.map((w,i)=>{const a=i*8,d=dec(w);return`<tr class="r" data-a="${a}"><td class="bp">${bps.has(a)?'●':''}</td><td>${hx(a,4)}</td><td class="mu">${w.toString(16).padStart(16,'0')}</td><td class="mu">${lb[a]?h(lb[a].join(' ')):''}</td><td>${h(dis(d))}</td></tr>`}).join('');
  draw()}
 function halt(kind,msg){S.halt=kind;if(kind=='end'){stat('Halted: end of program','ok');out('— end of program —','ok')}else{stat('Stopped: '+(kind=='ni'?'not implemented':'error'),'er');out(msg,'er')}
- const nz=[];for(let i=0;i<32;i++)if(i!=29&&S.r[i])nz.push(`${rn(i)}=${S.r[i]}`);out('Registers: '+(nz.join('  ')||'all zero')+`   | ${S.steps} instruction(s) executed`,'ok')}
+ const nz=[];for(let i=0;i<32;i++)if(i!=29&&S.r[i])nz.push(`${rn(i)}=${vt(S.r[i])}`);out('Registers: '+(nz.join('  ')||'all zero')+`   | ${S.steps} instruction(s) executed`,'ok')}
 function tick(){if(S.halt)return;const stg=S.stg,ph=PH[MODE][stg],NS=NAMES.length;let pc=S.r[29]>>>0;
  try{
  if(ph=='IF'){S.t=[];S.chg=new Set();S.fchg=false;S.snap=S.r.slice();S.pf=[S.e,S.g,S.s];
@@ -208,7 +219,7 @@ function tick(){if(S.halt)return;const stg=S.stg,ph=PH[MODE][stg],NS=NAMES.lengt
   if(pc%8)throw Error('Misaligned ip '+hx(pc,4));
   S.cur={pc,w:P[pc/8]};S.t[0]=`ip = <b>${hx(pc,4)}</b><br>word = <code>${S.cur.w.toString(16).padStart(16,'0')}</code><br><span class="mu">next ip = ip + 8</span>`}
  else if(ph=='DEC'){const c=S.cur,d=c.d=dec(c.w);if(!d.valid)throw Error('Unknown opcode 0x'+d.op.toString(16));const R=i=>S.r[i];
-  if(d.f=='R'||d.f=='C')c.a=R(d.rs1),c.b=d.I?d.imm|0:R(d.rs2);else if('USB'.includes(d.f))c.a=R(d.rs1);else if(d.f=='L')c.a=R(d.rs1);else if(d.f=='T'){c.a=R(d.rd);c.b=R(d.rs1)}else if(d.f=='K')c.a=R(d.rd);else if(d.f=='M')c.b=d.I?d.imm|0:R(d.rs2);
+  if(d.f=='R'||d.f=='C')c.a=R(d.rs1),c.b=d.I?d.imm|0:R(d.rs2);else if('USB'.includes(d.f))c.a=R(d.rs1);else if(d.f=='L')c.a=R(d.rs1);else if(d.f=='T'){c.a=R(d.rd);c.b=R(d.rs1)}else if(d.f=='K')c.a=R(d.rd);else if(d.f=='M')c.b=d.I?d.imm|0:R(d.rs2);else if((d.f=='F'&&d.mn[0]!='v')||d.f=='D'){c.a=R(d.rs1);c.b=R(d.rs2)}
   c.sp=R(30);c.ra=R(31);
   const fs=['rd','rs1','rs2','imm','bit','mode'].filter(k=>d[k]!==undefined).map(k=>`${k}=${d[k]}`).join(' ');
   S.t[stg]=`<b>${h(dis(d))}</b><br>opcode ${hx(d.op,2)} · type ${d.f}<br>${fs}`+(MODE==4?'<br>'+(c.a!==undefined?`A=${c.a} `:'')+(c.b!==undefined?`B=${c.b}`:''):'')}
@@ -217,19 +228,19 @@ function tick(){if(S.halt)return;const stg=S.stg,ph=PH[MODE][stg],NS=NAMES.lengt
  else if(ph=='MA'){const c=S.cur,t=macc(c);S.t[stg]=t||'<span class="mu">no data-memory access</span>'}
  else{const c=S.cur,x=c.x;if(x.wr)S.r[x.wr[0]]=x.wr[1];if(x.wv)x.wv.forEach(w=>S.r[w[0]]=w[1]);if(x.wr2)S.r[x.wr2[0]]=x.wr2[1];let mt='';if(MODE==4)mt=macc(c);if(x.ml)S.r[x.ml[0]]=c.mv;if(x.lv)c.mvv.forEach((v,i)=>S.r[x.lv[0]+i]=v);if(x.rt!==null){x.next=c.rv[0];S.r[31]=c.rv[1]}if(x.fl)[S.e,S.g,S.s]=x.fl;
   let nx=x.next;if((S.r[29]>>>0)!=c.pc)nx=S.r[29]>>>0;S.r[29]=nx|0;S.steps++;
-  const parts=[];for(let i=0;i<32;i++)if(S.r[i]!=S.snap[i]){S.chg.add(i);if(i!=29)parts.push(`${rn(i)}: ${S.snap[i]} → ${S.r[i]}`)}
+  const parts=[];for(let i=0;i<32;i++)if(S.r[i]!=S.snap[i]){S.chg.add(i);if(i!=29)parts.push(`${rn(i)}: ${vt(S.snap[i])} → ${vt(S.r[i])}`)}
   if([S.e,S.g,S.s].some((v,i)=>v!=S.pf[i])){S.fchg=true;parts.push(`flags E=${S.e} GT=${S.g} ST=${S.s}`)}
-  S.t[stg]=(x.wr?`<b>${rn(x.wr[0])}</b> ← ${x.wr[1]}`:(x.ml||x.mw||x.wr2||x.rt!==null?'':'no register written'))+(x.wr2?`<br><b>${rn(x.wr2[0])}</b> ← ${x.wr2[1]}`:'')+(x.ml?`<br><b>${rn(x.ml[0])}</b> ← memory[${hx(x.ml[1],4)}] = ${S.r[x.ml[0]]}`:'')+(MODE==4&&mt?'<br>'+mt.replace(/<br>$/,''):'')+(x.fl?`<br>flags ← E=${x.fl[0]} GT=${x.fl[1]} ST=${x.fl[2]}`:'')+`<br>ip ← <b>${hx(nx,4)}</b>`;
+  S.t[stg]=(x.wr?`<b>${rn(x.wr[0])}</b> ← ${vt(x.wr[1])}`:(x.ml||x.mw||x.wr2||x.rt!==null?'':'no register written'))+(x.wr2?`<br><b>${rn(x.wr2[0])}</b> ← ${x.wr2[1]}`:'')+(x.ml?`<br><b>${rn(x.ml[0])}</b> ← memory[${hx(x.ml[1],4)}] = ${vt(S.r[x.ml[0]])}`:'')+(MODE==4&&mt?'<br>'+mt.replace(/<br>$/,''):'')+(x.fl?`<br>flags ← E=${x.fl[0]} GT=${x.fl[1]} ST=${x.fl[2]}`:'')+`<br>ip ← <b>${hx(nx,4)}</b>`;
   out(`${hx(c.pc,4)}  ${dis(c.d).padEnd(22)}${parts.length?'| '+parts.join(', '):''}`)}
  S.last=stg;S.stg=(stg+1)%NS;stat(`${NAMES[stg]} · step ${S.steps+(stg<NS-1?1:0)}`,'mu')
  }catch(e){S.last=stg;S.stg=0;halt(e instanceof NI?'ni':'err',`${e.message} at ${hx(pc,4)}`)}}
 function draw(){const c=$('regs').children;
- for(let i=0;i<32;i++){c[i].children[1].textContent=S.r[i];c[i].children[2].textContent=hx(S.r[i]);c[i].classList.toggle('chg',S.chg.has(i))}
+ for(let i=0;i<32;i++){c[i].children[1].textContent=FMT=='float'?ft(S.r[i]):S.r[i];c[i].children[2].textContent=hx(S.r[i])+(FMT=='both'?' · '+ft(S.r[i])+'f':'');c[i].classList.toggle('chg',S.chg.has(i))}
  [['fe','e'],['fg','g'],['fs','s']].forEach(([id,k])=>$(id).classList.toggle('on',!!S[k]));
  for(let i=0;i<NAMES.length;i++){const b=$('sb'+i);b.classList.toggle('on',S.last==i);b.lastChild.innerHTML=S.t[i]||'<span class="mu">—</span>'}
  const ip=S.r[29]>>>0;document.querySelectorAll('#ls tr').forEach(t=>{t.classList.toggle('cur',+t.dataset.a==ip&&!S.halt||(S.halt&&+t.dataset.a==ip));t.children[0].textContent=bps.has(+t.dataset.a)?'●':''});
- {const sp=S.r[30]>>>0;let t='';if(sp%4||sp>MEMSZ)t='sp is outside data memory!';else if(sp==MEMSZ)t='(empty)';else for(let a=sp,k=0;a<MEMSZ&&k<12;a+=4,k++){t+=`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${mr(a)}${k==0?'   ← top (sp)':''}\n`}$('stk').textContent=t;
-  const b=(parseInt($('ma').value,16)||0)&~3;let u='';for(let k=0;k<8;k++){const a=b+4*k;u+=a+4<=MEMSZ&&a>=0?`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${mr(a)}\n`:''}$('mem').textContent=u||'(out of range)'}
+ {const sp=S.r[30]>>>0;let t='';if(sp%4||sp>MEMSZ)t='sp is outside data memory!';else if(sp==MEMSZ)t='(empty)';else for(let a=sp,k=0;a<MEMSZ&&k<12;a+=4,k++){t+=`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${vt(mr(a))}${k==0?'   ← top (sp)':''}\n`}$('stk').textContent=t;
+  const b=(parseInt($('ma').value,16)||0)&~3;let u='';for(let k=0;k<8;k++){const a=b+4*k;u+=a+4<=MEMSZ&&a>=0?`${hx(a,4)}  ${(mr(a)>>>0).toString(16).padStart(8,'0')}  ${vt(mr(a))}\n`:''}$('mem').textContent=u||'(out of range)'}
  $('cnt').textContent=`· ${S.steps} instruction(s) executed`}
 function prep(){if(dirty&&!build())return false;return !S.halt&&P.length>0}
 function pause(){clearInterval(timer);timer=null;$('bRun').textContent='▶ Run'}
@@ -241,12 +252,33 @@ $('bS').onclick=()=>{if(prep()){tick();draw()}};
 $('bI').onclick=()=>{if(prep()){do tick();while(!S.halt&&S.stg!=0);draw()}};
 $('bRun').onclick=()=>{if(timer)return pause();if(prep()){first=true;start()}};
 $('bR').onclick=()=>{if(dirty)build();else reset()};
+$('fm').value=FMT;
+$('fm').onchange=()=>{FMT=$('fm').value;try{localStorage.setItem('risc201fmt',FMT)}catch(e){}draw()};
 $('bA').onclick=build;
 $('ma').oninput=draw;
 $('spd').oninput=()=>{if(timer)start()};
 $('src').oninput=()=>{dirty=true;pause()};
 $('ls').onclick=e=>{const t=e.target.closest('tr');if(!t)return;const a=+t.dataset.a;bps.has(a)?bps.delete(a):bps.add(a);draw()};
-const EX={'Recursive factorial (call/ret + loop)':`; recursive factorial(10) with activation blocks, then iterative 5! pushed on stack
+const EX={'Floats and vectors (mov #1.5, fadd, vadd, vdot, vst/vld)':`; mov rd, #1.5 loads the float 1.5 as its 32-bit IEEE-754 bit pattern.
+; Use the Show selector above to see each register as an integer, a float, or both.
+mov r1, #1.5
+mov r2, #2.5
+fadd r3, r1, r2      ; 4.0
+; vectors: v1 = r20-r22, v2 = r23-r25, v3 = r26-r28
+mov r20, #1.0
+mov r21, #2.0
+mov r22, #3.0
+mov r23, #4.0
+mov r24, #5.0
+mov r25, #6.0
+vadd r26, r20, r23   ; (5, 7, 9)
+vcrs r26, r20, r23   ; (-3, 6, -3)
+vdot r5, r20, r23    ; 32
+vmag r7, r20         ; 3.741657
+vang r8, r20, r23    ; 0.2257 rad
+mov r10, #100
+vst r20, r10, #0     ; store v1 at address 100
+vld r26, r10, #0     ; load it back into v3`,'Recursive factorial (call/ret + loop)':`; recursive factorial(10) with activation blocks, then iterative 5! pushed on stack
 mov r0, 10
 call .factorial
 mov r6, r1       ; keep 10! in r6

@@ -13,6 +13,12 @@ inline void buildAbsRoutine(MicrocodeBuilder& b) {
 
     b.beginRoutine("ABS", isa::ABS);
 
+    // 0. abs uses CMP internally to test the sign. Only cmp/fcmp may change the architectural
+    //    flags, so save E/GT/ST here and put them back before the routine ends.
+    b.mmov(static_cast<int>(IR::FLAG_E),  static_cast<int>(IR::TMP2));
+    b.mmov(static_cast<int>(IR::FLAG_GT), static_cast<int>(IR::TMP3));
+    b.mmov(static_cast<int>(IR::FLAG_ST), static_cast<int>(IR::TMP4));
+
     // 1. Select rs1 and read its value.
     b.mmov(
         static_cast<int>(IR::RS1),
@@ -91,11 +97,12 @@ inline void buildAbsRoutine(MicrocodeBuilder& b) {
         isa::SUB
     );
 
-    // 9. Write the result to architectural destination rd.
+    // 9. Write the result back to rs1. abs is a one-operand (R1S) instruction like incr/decr:
+    //    the decoder leaves rd at 0 and the register to update is in rs1.
     b.label("ABS_WRITEBACK");
 
     b.mmov(
-        static_cast<int>(IR::RD),
+        static_cast<int>(IR::RS1),
         static_cast<int>(IR::REG_SRC)
     );
 
@@ -106,7 +113,12 @@ inline void buildAbsRoutine(MicrocodeBuilder& b) {
         static_cast<int>(RegisterFileAction::WRITE)
     );
 
-    // 10. Return to the shared preamble.
+    // 10. Restore the flags saved at the start.
+    b.mmov(static_cast<int>(IR::TMP2), static_cast<int>(IR::FLAG_E));
+    b.mmov(static_cast<int>(IR::TMP3), static_cast<int>(IR::FLAG_GT));
+    b.mmov(static_cast<int>(IR::TMP4), static_cast<int>(IR::FLAG_ST));
+
+    // 11. Return to the shared preamble.
     b.mb("MICROCODE_END");
 
     b.finishRoutine();

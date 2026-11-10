@@ -4,6 +4,7 @@
 #include <utility>
 #include <vector>
 
+#include "datapath/register_file.h"
 #include "test_framework.h"
 
 namespace testing {
@@ -33,6 +34,7 @@ void check(bool ok, const char* expr, const char* file, int line) {
 int main(int argc, char** argv) {
     using namespace testing;
     const char* filter = argc > 1 ? argv[1] : nullptr;
+    risc201::display_format() = risc201::NumFormat::Int;   // the older tests expect plain integer output
 
     int run = 0, failed_tests = 0;
     for (auto& [name, fn] : registry()) {

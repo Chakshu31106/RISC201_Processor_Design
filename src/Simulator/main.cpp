@@ -17,6 +17,7 @@ static void usage(const char* prog) {
         "  --trace    print every executed instruction (with --run)\n"
         "  --perf     after --run, print pipeline statistics (4-stage vs 6-stage)\n"
         "  --fwd      with --perf, assume operand forwarding\n"
+        "  --fmt int|float|both   how registers/memory are shown (default both)\n"
         "  -h, --help show this text\n";
 }
 
@@ -32,6 +33,13 @@ int main(int argc, char** argv) {
         else if (a == "--trace") trace = true;
         else if (a == "--perf") perf = true;
         else if (a == "--fwd") fwd = true;
+        else if (a == "--fmt" && i + 1 < argc) {
+            std::string v = argv[++i];
+            if (v == "int") display_format() = NumFormat::Int;
+            else if (v == "float") display_format() = NumFormat::Float;
+            else if (v == "both") display_format() = NumFormat::Both;
+            else { std::cerr << "--fmt must be int, float or both\n"; return 1; }
+        }
         else if (a == "-h" || a == "--help") { usage(argv[0]); return 0; }
         else if (!a.empty() && a[0] == '-') {
             std::cerr << "Unknown option: " << a << "\n";
@@ -55,7 +63,7 @@ int main(int argc, char** argv) {
 
         std::cout << "Stopped: " << to_string(r);
         if (!cpu.message().empty()) std::cout << " (" << cpu.message() << ")";
-        std::cout << " after " << cpu.steps() << " steps.\n\n" << cpu.regs().dump();
+        std::cout << " after " << cpu.steps() << " steps.\n\n" << cpu.regs().dump(display_format());
         if (perf && !cpu.pipe_trace().empty()) {
             PipeStats four, six;
             run_pipeline_model(cpu.pipe_trace(), fwd, four, six);

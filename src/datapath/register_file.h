@@ -1,11 +1,41 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <string>
 
 #include "ISA/registers.h"
 
 namespace risc201 {
+
+// How register / memory words are shown to the user. Every register and memory word is a raw
+// 32-bit pattern: integer instructions treat it as an int, float instructions (fadd, vadd, ...)
+// treat the SAME bits as an IEEE-754 float. Change with the `fmt` debugger command or --fmt.
+enum class NumFormat { Int, Float, Both };
+
+// The one display setting shared by the debugger, trace output and register dump.
+inline NumFormat& display_format() {
+    static NumFormat f = NumFormat::Both;
+    return f;
+}
+
+// The 32 bits of `v` read as an IEEE-754 float, as text (e.g. 1065353216 -> "1").
+inline std::string float_text(int32_t v) {
+    float f;
+    std::memcpy(&f, &v, sizeof f);
+    char buf[48];
+    std::snprintf(buf, sizeof buf, "%.7g", static_cast<double>(f));
+    return buf;
+}
+
+// `v` in the current display format: "12", "1.5f" or "1069547520 (1.5f)".
+inline std::string value_text(int32_t v, NumFormat fmt) {
+    if (fmt == NumFormat::Int) return std::to_string(v);
+    if (fmt == NumFormat::Float) return float_text(v) + "f";
+    return std::to_string(v) + " (" + float_text(v) + "f)";
+}
+inline std::string value_text(int32_t v) { return value_text(v, display_format()); }
 
 // RISC201 register file.
 //   r0  - r19 : general purpose
@@ -48,7 +78,8 @@ public:
     bool flag_st() const { return st_; }
 
     // Human-readable dump for the CLI / debugger ("regs").
-    std::string dump() const;
+    // fmt = Int keeps the classic two-column layout; Float / Both print one register per line.
+    std::string dump(NumFormat fmt = NumFormat::Int) const;
 
 private:
     int32_t regs_[NUM_REGS];

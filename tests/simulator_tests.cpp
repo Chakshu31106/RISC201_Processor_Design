@@ -8,6 +8,7 @@
 #include "datapath/register_file.h"
 #include "Simulator/cpu.h"
 #include "Simulator/decoder.h"
+#include "Simulator/micro_executor.h"
 #include "Simulator/simulator.h"
 #include "test_framework.h"
 #include "test_helpers.h"
@@ -300,6 +301,19 @@ TEST(cpu_reset_allows_rerun) {
     CHECK_EQ(reg(cpu, 1), 9);
 }
 
+TEST(fmt_command_shows_float_view_of_registers) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, 0x3FC00000"}));   // bit pattern of 1.5f
+    cpu.run();
+    std::istringstream in("fmt both\nreg 1\nfmt float\nreg 1\nfmt int\nreg 1\nquit\n");
+    std::ostringstream out;
+    run_cli(cpu, in, out);
+    display_format() = NumFormat::Int;
+    CHECK(out.str().find("1069547520 (1.5f)") != std::string::npos);
+    CHECK(out.str().find("r1 = 1.5f") != std::string::npos);
+    CHECK(out.str().find("r1 = 1069547520  (0x") != std::string::npos);
+}
+
 TEST(cpu_trace_reports_changed_registers) {
     CPU cpu;
     CHECK(boot(cpu, {"mov r1, 5", "nop"}));
@@ -563,74 +577,92 @@ TEST(debugger_six_stage_view_splits_memory_access_and_writeback) {
     CHECK_EQ(reg(cpu2, 30), 65532);
 }
 
-// Runs the same program hardwired and through the microprogrammed control unit
-// and requires identical registers, flags and data memory.
-static void expect_same_in_both_modes(const std::vector<std::string>& prog, uint64_t* micro_count = nullptr) {
-    CPU a, b;
-    CHECK(boot(a, prog));
-    CHECK(boot(b, prog));
-    b.set_micro_mode(true);
-    a.run();
-    b.run();
-    CHECK(a.last_stop() == b.last_stop());
-    for (int i = 0; i < 32; ++i) CHECK_EQ(reg(a, i), reg(b, i));
-    CHECK(a.regs().flag_e() == b.regs().flag_e());
-    CHECK(a.regs().flag_gt() == b.regs().flag_gt());
-    CHECK(a.regs().flag_st() == b.regs().flag_st());
-    bool same_memory = true;
-    for (uint32_t addr = 0; addr < CPU::kDataMemorySize; addr += 4)
-        if (a.dmem().readWord(addr) != b.dmem().readWord(addr)) same_memory = false;
-    CHECK(same_memory);
-    if (micro_count) *micro_count = b.micro_instructions();
-}
-
-TEST(micro_mode_matches_hardwired_arithmetic_logic_and_branches) {
-    uint64_t n = 0;
-    expect_same_in_both_modes({"mov r1, 12", "mov r2, 10", "add r3, r1, r2", "sub r4, r1, r2", "mul r5, r1, r2",
-        "and r6, r1, r2", "or r7, r1, r2", "xor r8, r1, r2", "lsl r9, r1, 2", "lsr r10, r1, 1", "not r11",
-        "cmp r1, r2", "bgt skip", "mov r12, 99", "skip: incr r2", "decr r1", "nop"}, &n);
-    CHECK(n > 10);   // most instructions really went through microcode
-}
-
-TEST(micro_mode_matches_hardwired_loop_and_memory) {
-    uint64_t n = 0;
-    expect_same_in_both_modes({"mov r1, 1", "mov r2, 5", "loop:", "mul r1, r1, r2", "decr r2", "cmp r2, 0", "bgt loop",
-        "mov r3, 0x2000", "st r1, 4[r3]", "ld r4, 4[r3]", "push r4", "pop r5"}, &n);
-    CHECK(n > 10);
-}
-
-TEST(micro_mode_matches_hardwired_floating_point) {
-    expect_same_in_both_modes({"mov r1, 0x40200000", "mov r2, 0x40900000", "fadd r3, r1, r2", "fmul r4, r1, r2",
-        "fcmp r1, r2", "mov r5, 0x41100000", "sqrt r6, r5"});
-}
-
-TEST(micro_mode_runs_stack_and_calls_through_microcode) {
-    // Same program in both modes, including push/pop/call/ret and mov #imm.
-    uint64_t n = 0;
-    expect_same_in_both_modes({"mov r1, 6", "call f", "b done", "f: push r1", "mpop 0", "pop r2", "call g", "ret", "g: peek r3", "push r2", "peek r4", "pop r5", "ret", "done: nop"}, &n);
+TEST(control_unit_runs_arithmetic_logic_and_branches) {
     CPU cpu;
-    CHECK(boot(cpu, {"mov r1, 6", "call f", "b done", "f: push r1", "pop r2", "ret", "done: nop"}));
-    cpu.set_micro_mode(true);
+    CHECK(boot(cpu, {"mov r1, 12", "mov r2, 10", "add r3, r1, r2", "sub r4, r1, r2", "mul r5, r1, r2",
+        "and r6, r1, r2", "or r7, r1, r2", "xor r8, r1, r2", "lsl r9, r1, 2", "lsr r10, r1, 1", "not r11",
+        "cmp r1, r2", "bgt skip", "mov r12, 99", "skip: incr r2", "decr r1", "nop"}));
     CHECK(cpu.run() == StopReason::EndOfProgram);
-    CHECK_EQ(reg(cpu, 2), 6);
-    CHECK_EQ(cpu.micro_fallbacks(), 0u);          // every instruction has microcode now
-    CHECK_EQ(cpu.micro_instructions(), 7u);
+    CHECK_EQ(reg(cpu, 3), 22);  CHECK_EQ(reg(cpu, 4), 2);   CHECK_EQ(reg(cpu, 5), 120);
+    CHECK_EQ(reg(cpu, 6), 8);   CHECK_EQ(reg(cpu, 7), 14);  CHECK_EQ(reg(cpu, 8), 6);
+    CHECK_EQ(reg(cpu, 9), 48);  CHECK_EQ(reg(cpu, 10), 6);  CHECK_EQ(reg(cpu, 11), -1);
+    CHECK_EQ(reg(cpu, 12), 0);                                   // bgt skipped the mov
+    CHECK_EQ(reg(cpu, 2), 11);  CHECK_EQ(reg(cpu, 1), 11);
+}
+
+TEST(control_unit_runs_loop_and_memory) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, 1", "mov r2, 5", "loop:", "mul r1, r1, r2", "decr r2", "cmp r2, 0", "bgt loop",
+        "mov r3, 0x2000", "st r1, 4[r3]", "ld r4, 4[r3]", "push r4", "pop r5"}));
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK_EQ(reg(cpu, 1), 120);
+    CHECK_EQ(reg(cpu, 4), 120);
+    CHECK_EQ(reg(cpu, 5), 120);
+    CHECK_EQ(cpu.dmem().readWord(0x2004), 120u);
     CHECK_EQ(reg(cpu, 30), 65536);
 }
 
-TEST(micro_mode_reports_the_same_stack_errors) {
-    CPU a, b;
-    CHECK(boot(a, {"pop r1"}));
-    CHECK(boot(b, {"pop r1"}));
-    b.set_micro_mode(true);
-    CHECK(a.run() == StopReason::Error);
-    CHECK(b.run() == StopReason::Error);
-    CHECK(a.message() == b.message());
+TEST(control_unit_runs_floating_point) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, 0x40200000", "mov r2, 0x40900000", "fadd r3, r1, r2", "fmul r4, r1, r2",
+        "fcmp r1, r2", "mov r5, 0x41100000", "sqrt r6, r5"}));
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 3)), 0x40E00000u);   // 2.5 + 4.5 = 7.0
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 4)), 0x41340000u);   // 2.5 * 4.5 = 11.25
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 6)), 0x40400000u);   // sqrt(9.0) = 3.0
+    CHECK(cpu.regs().flag_st() && !cpu.regs().flag_e() && !cpu.regs().flag_gt());   // 2.5 < 4.5
 }
 
-TEST(vector_ops_in_micro_mode_compute_add_dot_sub_cross) {
+TEST(stack_and_calls_run_through_microcode) {
     CPU cpu;
-    cpu.set_micro_mode(true);
+    CHECK(boot(cpu, {"mov r1, 6", "call f", "b done", "f: push r1", "pop r2", "ret", "done: nop"}));
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK_EQ(reg(cpu, 2), 6);
+    CHECK_EQ(cpu.micro_instructions(), 7u);
+    CHECK_EQ(reg(cpu, 30), 65536);
+
+    CPU nested;
+    CHECK(boot(nested, {"mov r1, 6", "call f", "b done", "f: push r1", "mpop 0", "pop r2", "call g", "ret",
+                        "g: peek r3", "push r2", "peek r4", "pop r5", "ret", "done: nop"}));
+    CHECK(nested.run() == StopReason::EndOfProgram);
+    CHECK_EQ(reg(nested, 30), 65536);
+}
+
+TEST(stack_errors_have_clear_messages) {
+    CPU a;
+    CHECK(boot(a, {"pop r1"}));
+    CHECK(a.run() == StopReason::Error);
+    CHECK(a.message().find("Stack underflow (stack is empty)") != std::string::npos);
+    CPU b;
+    CHECK(boot(b, {"mov r1, 1", "loop: push r1", "b loop"}));
+    CHECK(b.run() == StopReason::Error);
+    CHECK(b.message().find("Stack overflow") != std::string::npos);
+    CPU c;
+    CHECK(boot(c, {"ret"}));
+    CHECK(c.run() == StopReason::Error);
+    CHECK(c.message().find("Stack underflow") != std::string::npos);
+}
+
+TEST(only_compare_instructions_change_the_flags) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, 5", "cmp r1, 2", "abs r2", "incr r1", "add r3, r1, r1"}));   // cmp: GT
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK(cpu.regs().flag_gt() && !cpu.regs().flag_e() && !cpu.regs().flag_st());
+}
+
+TEST(memory_addresses_out_of_range_give_a_clear_error) {
+    CPU a;
+    CHECK(boot(a, {"mov r1, 70000", "st r2, 0[r1]"}));
+    CHECK(a.run() == StopReason::Error);
+    CHECK(a.message().find("Data memory address") != std::string::npos);
+    CPU b;
+    CHECK(boot(b, {"mov r1, 65528", "vld r20, r1, #0"}));      // third word would be at 65536
+    CHECK(b.run() == StopReason::Error);
+    CHECK(b.message().find("out of range") != std::string::npos);
+}
+
+TEST(vector_ops_compute_add_dot_sub_cross) {
+    CPU cpu;
     CHECK(boot(cpu, {"mov r20, 0x3F800000", "mov r21, 0x40000000", "mov r22, 0x40400000",
                      "mov r23, 0x40800000", "mov r24, 0x40A00000", "mov r25, 0x40C00000",
                      "vadd r26, r20, r23", "vdot r5, r20, r23"}));
@@ -641,24 +673,20 @@ TEST(vector_ops_in_micro_mode_compute_add_dot_sub_cross) {
     CHECK_EQ(static_cast<uint32_t>(reg(cpu, 5)),  0x42000000u);   // 32.0
 }
 
-TEST(vector_ops_reject_invalid_vector_ids_in_both_modes) {
-    for (bool micro : {false, true}) {
-        CPU cpu;
-        cpu.set_micro_mode(micro);
-        CHECK(boot(cpu, {"vadd r20, r23, r27"}));   // r27 is not a vector operand
-        CHECK(cpu.run() == StopReason::Error);
-        CHECK(cpu.message().find("not a valid vector id") != std::string::npos);
+TEST(vector_ops_reject_invalid_vector_ids) {
+    CPU cpu;
+    CHECK(boot(cpu, {"vadd r20, r23, r27"}));   // r27 is not a vector operand
+    CHECK(cpu.run() == StopReason::Error);
+    CHECK(cpu.message().find("not a valid vector id") != std::string::npos);
 
-        CPU dot;
-        dot.set_micro_mode(micro);
-        CHECK(boot(dot, {"vdot r5, r20, r7"}));          // rs2 = r7 is not a vector id
-        CHECK(dot.run() == StopReason::Error);
-        CHECK(dot.message().find("vs2") != std::string::npos);
-    }
+    CPU dot;
+    CHECK(boot(dot, {"vdot r5, r20, r7"}));          // rs2 = r7 is not a vector id
+    CHECK(dot.run() == StopReason::Error);
+    CHECK(dot.message().find("vs2") != std::string::npos);
 }
 
-TEST(vector_load_store_work_without_micro_mode_and_check_the_vector_id) {
-    CPU cpu;   // hardwired mode: vector instructions still run through the control unit
+TEST(vector_load_store_work_and_check_the_vector_id) {
+    CPU cpu;
     CHECK(boot(cpu, {"mov r20, 7", "mov r21, 8", "mov r22, 9", "mov r4, 0x100",
                      "vst r20, r4, #0",    // store v1 (r20-r22) at 0x100
                      "vld r23, r4, #0"}));  // load it into v2 (r23-r25)
@@ -693,4 +721,33 @@ TEST(pipeline_model_matches_isa_sim_on_factorial) {
 
     cpu.reset();
     CHECK(cpu.pipe_trace().empty());                           // reset clears the recorded trace
+}
+
+TEST(every_instruction_runs_through_the_control_unit) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, 5", "push r1", "pop r2", "abs r2", "add r3, r1, r2", "st r3, 0[r0]",
+                     "ld r4, 0[r0]", "cmp r3, r4", "beq done", "nop", "done: vadd r26, r20, r23", "nop"}));
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK_EQ(reg(cpu, 4), 10);
+    CHECK_EQ(cpu.micro_instructions(), cpu.steps());
+}
+
+TEST(every_opcode_has_a_microcode_routine) {
+    MicroExecutor mx;
+    int checked = 0;
+    for (const auto& kv : kOpcodeTable) {
+        DecodedInstr d = decode(static_cast<uint64_t>(kv.second.opcode) << 57);
+        CHECK(mx.can_run(d));
+        ++checked;
+    }
+    CHECK(checked >= 57);
+}
+
+TEST(float_literals_load_their_ieee_bit_patterns) {
+    CPU cpu;
+    CHECK(boot(cpu, {"mov r1, #1.5", "mov r2, #2.5", "fadd r3, r1, r2", "mov r4, #-0.5"}));
+    CHECK(cpu.run() == StopReason::EndOfProgram);
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 1)), 0x3FC00000u);
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 3)), 0x40800000u);   // 4.0
+    CHECK_EQ(static_cast<uint32_t>(reg(cpu, 4)), 0xBF000000u);   // -0.5
 }
